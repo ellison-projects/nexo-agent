@@ -2,8 +2,8 @@ module.exports = {
       apps: [
             {
                   name: 'telegram-bot',
-                  script: 'npm.cmd',
-                  args: 'run dev',
+                  script: 'node_modules/tsx/dist/cli.mjs',
+                  args: '--env-file=.env src/index.ts',
                   autorestart: true,
                   max_restarts: 10,
                   restart_delay: 3000,
