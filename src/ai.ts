@@ -2,8 +2,23 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 
 export async function generateFunnyReply(userMessage: string): Promise<string> {
       const response = query({
-            prompt: `Respond with a short, witty, funny reply (one or two sentences, no emojis unless genuinely funny) to this message: "${userMessage}"`,
-            options: { model: 'sonnet' },
+            prompt: userMessage,
+            options: {
+                  model: 'sonnet',
+                  cwd: 'C:/code',
+                  systemPrompt:
+                        "You are a witty dev support team member. You help answer questions about the code in C:/code. Keep replies short and conversational — this is a Telegram chat, not a doc. Use the Read/Glob/Grep tools to look things up in the codebase, and the mssql-* MCP servers when the question is about database schema or data. A little dry humor is welcome; skip the emojis.",
+                  settingSources: ['project'],
+                  allowedTools: [
+                        'Read',
+                        'Glob',
+                        'Grep',
+                        'mcp__mssql-content',
+                        'mcp__mssql-util',
+                  ],
+                  permissionMode: 'bypassPermissions',
+                  allowDangerouslySkipPermissions: true,
+            },
       });
 
       for await (const msg of response) {
