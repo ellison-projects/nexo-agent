@@ -1,0 +1,7 @@
+{
+  "enabledMcpjsonServers": [
+    "mssql-content",
+    "mssql-content-dev",
+    "mssql-util"
+  ]
+}
