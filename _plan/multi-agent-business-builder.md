@@ -58,8 +58,10 @@ A **round** is one pass through all four roles plus a synthesis step. A **sessio
 
 ```
 for each role in [strategist, cto, marketer, analyst]:
-  1. load brief.md + state/*.md + last N transcripts
-  2. prompt the role: "Here's the state. Here's your job. What do you change / add / recommend?"
+  1. load brief.md + state/*.md + last N transcripts (including THIS round's prior turns)
+  2. prompt the role, with two required beats:
+     a) CHALLENGE: "What did the prior agents get wrong or miss? Push back specifically."
+     b) CONTRIBUTE: "Now what do you add or change from your own angle?"
   3. let the agent use Edit/Write on files under state/ (scoped via cwd)
   4. append its reasoning + file diff summary to transcripts/<timestamp>-<role>.md
 
@@ -67,6 +69,8 @@ then (synthesis step):
   5. Strategist agent runs a "close the round" turn that reads the other three turns
      and rewrites state/daily/YYYY-MM-DD.md — the current best Top-10
 ```
+
+The CHALLENGE beat is non-optional — it's why we pay for multiple rounds. Each agent must name at least one thing from the current state they disagree with before adding their own contribution. If they have nothing to push back on, the session is near convergence and should stop soon anyway.
 
 Each round overwrites the day's plan in place. If the session crashes at round 17, you still have round 16's plan waiting for you in the morning — it's not worse than no plan, it's just not fully cooked.
 
@@ -206,20 +210,26 @@ Mirror `src/ai.ts`:
 Matching the PDF's "human in the loop" framing:
 
 1. `npm run crew -- init my-biz` and fill in `brief.md` (idea, budget, constraints, skills).
-2. Run one round each morning. Read the daily plan. Do the checkboxed tasks.
+2. At ~11pm: `npm run crew -- run my-biz` on the VPS, disconnect SSH. Morning: read the daily plan, do the checkboxed tasks.
 3. Update `metrics.md` with real numbers (MRR, pre-orders, follower count, top comments).
 4. Record the TikTok the Marketer scripted. Post it. Paste comment exports back into a `state/comments/YYYY-MM-DD.txt` file for the Analyst to chew on next round.
 5. Say yes/no on decisions the Strategist teed up.
 
-## Open questions for the user
+## Decisions & open questions
 
-1. ~~**Number of roles**~~ — **decided: 4** (Strategist / CTO / Marketer / Analyst).
-2. ~~**Model per role**~~ — **decided: Opus for all four.** The whole premise is "AI is the employee" — no point picking a cheaper brain for the employees.
-3. ~~**Round cadence**~~ — **decided: 1 round/day.** Each role takes a turn, Strategist closes with the Top-10, commit, done. Multiple rounds allowed on-demand via `--rounds N` but 1/day is the rhythm.
-4. **Comment ingestion** — when you post TikToks, comments are where demand signal lives (the PDF's Step 4 is the whole business). "Ingestion" = how those comments get into the Analyst's hands. Two options: (a) you manually paste/export them into `projects/<slug>/state/comments/YYYY-MM-DD.txt` each day, or (b) we wire in Apify (Robbie's tool) to scrape them automatically. Start with manual to stay simple; add Apify once you have enough videos posting to make it worth it.
-5. ~~**Where does `projects/` live**~~ — **decided: inside the repo, gitignored.** One less thing to configure.
-6. **Telegram integration** — should the existing bot become the mobile UI for the crew (`/crew status`, `/crew run`, daily plan pushed as a Telegram message)? Probably yes, but as a v2 — ship the CLI first.
-7. **TikTok/Stripe/Gumroad credentials** — the agents will propose these actions but the human signs up. Confirmed, or do we want the CTO to have any browser-automation ability at some point?
+### Decided
+
+- **4 roles**: Strategist / CTO / Marketer / Analyst.
+- **Model**: Opus for all four.
+- **Run shape**: 11pm trigger → detached process → many rounds back-to-back overnight. Each round: all 4 agents take a turn, each challenging prior turns before contributing. Stops at `--until 07:00` / `--budget $20` / `--rounds 30` / convergence, whichever first.
+- **`projects/` location**: inside the repo, gitignored.
+- **Comment ingestion (v1)**: manual — you paste TikTok comments into `projects/<slug>/state/comments/YYYY-MM-DD.txt` before triggering the run. Apify integration is a v2 concern.
+
+### Still open
+
+1. **Telegram integration** — should the existing bot become the mobile UI for the crew (`/crew status`, `/crew run`, daily plan pushed as a Telegram message)? Probably yes, but as v2 — ship the CLI first.
+2. **Browser automation for CTO** — v1 it's strict "propose, human executes." Worth revisiting once we see where the bottleneck actually is.
+3. **Convergence signal** — how exactly does Strategist declare "no material change"? Heuristic: same top 3 in same order for 3 consecutive rounds. Good enough for v1 or too strict?
 
 ## Non-goals (for v1)
 
