@@ -37,6 +37,7 @@ Base URL: `https://app.nexoprm.com`
    - 2+ matches → present candidates with distinguishing info (email/phone/relationship) and wait for the user to pick
    - Never guess a person id.
 4. Prefer `PATCH` over recreate; most updates are idempotent.
+5. **When unsure, ask first.** If a name is ambiguous, the content of a moment/item is unclear, or the right endpoint isn't obvious, confirm with the user before writing.
 
 ## Error shape
 
@@ -154,49 +155,61 @@ At most one active list per user. Creating a new list retires the old one. `{id}
 
 ---
 
-## Common flows
+## Primary flows (worked end-to-end)
 
-**Log a moment about someone**
-1. `GET /api/agent/people?q=sarah` → pick id (apply disambiguation rules)
-2. `POST /api/agent/moments` with `{ person_id, content }`
-3. Optionally check `GET /api/agent/ai-reminders?personId=<id>&status=new` later — analysis is async.
-
-**Look up someone's birthday**
-1. `GET /api/agent/people?q=sarah` → get id
-2. `GET /api/agent/people/{id}` → scan `important_dates`.
-
-**Mark a reminder handled**
-1. `GET /api/agent/ai-reminders?status=new`
-2. `PATCH /api/agent/ai-reminders/{id}` with `{ "status": "done" }`.
-
-**Add a durable fact**
-1. Resolve the person id.
-2. `POST /api/agent/things-to-remember` with `{ person_id, content }`.
-
-**Add to the current plan**
-1. `POST /api/agent/working-notes/latest/items` with `{ content }`
-2. If 404: `POST /api/agent/working-notes` then retry with the new id.
-
-**Check off a plan item**
-1. `GET /api/agent/working-notes/latest` → find item by content
-2. `PATCH /api/agent/working-note-items/{itemId}` with `{ "checked": true }`.
-
-**Add to groceries**
-1. `POST /api/agent/groceries/lists/active/items` with `{ "name": "milk" }`
-2. If 404: `POST /api/agent/groceries/lists` then retry.
+These three flows cover the main use cases. Each shows the user prompt, the curl calls, the expected response JSON, and how to branch on ambiguity or missing parent records.
 
 ---
 
-## Example requests
+### Flow A — Add a moment for a contact
 
-Search people:
+**User:** "Log that Sarah mentioned her dad is in the hospital."
+
+**Step 1. Search for the person.**
 ```bash
 curl -s "https://app.nexoprm.com/api/agent/people?q=sarah" \
   -H "Authorization: Bearer $NEXO_API_KEY" \
   -H "X-Nexo-User: $NEXO_USER"
 ```
 
-Log a moment:
+Expected response:
+```json
+{
+  "people": [
+    { "id": "42", "name": "Sarah Chen", "email": "sarah@example.com", "phone": null }
+  ]
+}
+```
+
+**Branch on match count:**
+
+- **1 match** → use `people[0].id` and proceed to step 2.
+- **0 matches** → ask the user before creating:
+  > "I don't have a Sarah yet. Create a new contact 'Sarah' and log the moment, or did you mean someone else?"
+
+  If confirmed, create first:
+  ```bash
+  curl -s -X POST "https://app.nexoprm.com/api/agent/people" \
+    -H "Authorization: Bearer $NEXO_API_KEY" \
+    -H "X-Nexo-User: $NEXO_USER" \
+    -H "Content-Type: application/json" \
+    -d '{"name":"Sarah"}'
+  ```
+  Response: `{ "person": { "id": "57", "name": "Sarah", ... } }` (201). Use that id.
+
+- **2+ matches** → list candidates and wait. Never guess.
+  ```json
+  {
+    "people": [
+      { "id": "42", "name": "Sarah Chen",    "email": "sarah@example.com", "phone": null },
+      { "id": "88", "name": "Sarah Okafor",  "email": null,                "phone": "+1 555-0134" }
+    ]
+  }
+  ```
+  Ask:
+  > "I have two Sarahs — Sarah Chen (sarah@example.com) and Sarah Okafor (555-0134). Which one?"
+
+**Step 2. Log the moment.**
 ```bash
 curl -s -X POST "https://app.nexoprm.com/api/agent/moments" \
   -H "Authorization: Bearer $NEXO_API_KEY" \
@@ -205,28 +218,157 @@ curl -s -X POST "https://app.nexoprm.com/api/agent/moments" \
   -d '{"person_id":"42","content":"Sarah mentioned her dad is in the hospital."}'
 ```
 
-Add a grocery item to the active list:
+Expected response (201):
+```json
+{
+  "moment": {
+    "id": "812",
+    "person_id": "42",
+    "content": "Sarah mentioned her dad is in the hospital.",
+    "created_at": "2026-04-17T14:30:00Z"
+  },
+  "ai_analysis_queued": true
+}
+```
+
+Confirm to the user:
+> "Logged a moment on Sarah Chen. AI reminders will come through shortly if anything's flagged."
+
+---
+
+### Flow B — Add a grocery item
+
+**User:** "Add milk to my groceries."
+
+**Step 1. Try adding to the active list directly.**
 ```bash
 curl -s -X POST "https://app.nexoprm.com/api/agent/groceries/lists/active/items" \
   -H "Authorization: Bearer $NEXO_API_KEY" \
   -H "X-Nexo-User: $NEXO_USER" \
   -H "Content-Type: application/json" \
-  -d '{"name":"milk","note":"2%"}'
+  -d '{"name":"milk"}'
 ```
 
-Delete (note the mandatory `confirm=true`):
+Expected response (201):
+```json
+{
+  "item": {
+    "id": "3041",
+    "grocery_list_id": "17",
+    "name": "milk",
+    "note": null,
+    "checked": false,
+    "checked_at": null
+  }
+}
+```
+
+Confirm:
+> "Added milk to your groceries list."
+
+**Branch: no active list yet (404).** Response:
+```json
+{ "error": "no active grocery list", "code": "not_found" }
+```
+
+Create one, then retry:
 ```bash
-curl -s -X DELETE "https://app.nexoprm.com/api/agent/moments/812?confirm=true" \
+curl -s -X POST "https://app.nexoprm.com/api/agent/groceries/lists" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User: $NEXO_USER" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+Response: `{ "grocery_list": { "id": "17", "name": null, "active": true, ... } }` (201).
+
+Then repeat the `POST .../lists/active/items` call.
+
+**Ambiguity check:** if the user writes "add apples and bread" — two items — ask once:
+> "Add those as two separate items (apples, bread)?"
+
+---
+
+### Flow C — Add to a working note (plan) item
+
+**User:** "Add 'call the plumber' to my plan."
+
+**Step 1. Try appending to the latest note.**
+```bash
+curl -s -X POST "https://app.nexoprm.com/api/agent/working-notes/latest/items" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User: $NEXO_USER" \
+  -H "Content-Type: application/json" \
+  -d '{"content":"Call the plumber"}'
+```
+
+Expected response (201):
+```json
+{
+  "item": {
+    "id": "904",
+    "working_note_id": "61",
+    "content": "Call the plumber",
+    "parent_id": null,
+    "is_heading": false,
+    "checked": false,
+    "sort_order": 7
+  }
+}
+```
+
+Confirm:
+> "Added 'Call the plumber' to your current plan."
+
+**Branch: no note yet (404).** Response:
+```json
+{ "error": "no working notes yet", "code": "not_found" }
+```
+
+Create one, then retry:
+```bash
+curl -s -X POST "https://app.nexoprm.com/api/agent/working-notes" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User: $NEXO_USER" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+Response: `{ "working_note": { "id": "61", "priorities_text": null, ... } }` (201).
+
+Then repeat the `POST .../latest/items` call.
+
+**Ambiguity check:** if the user says "add it under Home" — they want the item nested under a heading called "Home". Fetch the note, find the heading id, and pass it as `parent_id`:
+```bash
+curl -s "https://app.nexoprm.com/api/agent/working-notes/latest" \
   -H "Authorization: Bearer $NEXO_API_KEY" \
   -H "X-Nexo-User: $NEXO_USER"
 ```
-
-Dry-run a write:
-```bash
-curl -s -X POST "https://app.nexoprm.com/api/agent/people" \
-  -H "Authorization: Bearer $NEXO_API_KEY" \
-  -H "X-Nexo-User: $NEXO_USER" \
-  -H "X-Nexo-Dry-Run: true" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Test Person"}'
+Response (abbreviated):
+```json
+{
+  "working_note": { "id": "61" },
+  "items": [
+    { "id": "900", "content": "Home", "is_heading": true,  "parent_id": null },
+    { "id": "901", "content": "Work", "is_heading": true,  "parent_id": null }
+  ]
+}
 ```
+If no "Home" heading exists, ask:
+> "I don't see a 'Home' heading on your current plan. Create it, or add the item at the top level?"
+
+Otherwise POST with `parent_id: "900"`.
+
+---
+
+## Other common operations (quick reference)
+
+- **Look up a birthday:** `GET /people?q=...` → `GET /people/{id}` → scan `important_dates`.
+- **Mark a reminder handled:** `GET /ai-reminders?status=new` → `PATCH /ai-reminders/{id}` with `{ "status": "done" }`.
+- **Add a durable fact about someone:** resolve id → `POST /things-to-remember` with `{ person_id, content }`.
+- **Check off a plan item:** `GET /working-notes/latest` → find item → `PATCH /working-note-items/{id}` with `{ "checked": true }`.
+- **Delete anything:** append `?confirm=true`. Only after explicit user intent. Example:
+  ```bash
+  curl -s -X DELETE "https://app.nexoprm.com/api/agent/moments/812?confirm=true" \
+    -H "Authorization: Bearer $NEXO_API_KEY" \
+    -H "X-Nexo-User: $NEXO_USER"
+  ```
+- **Dry-run a write** (validate without persisting): add `-H "X-Nexo-Dry-Run: true"` to any POST/PATCH/DELETE.
