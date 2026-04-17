@@ -2,7 +2,9 @@
 
 ## Goal
 
-Turn this repo into a launcher for a small "virtual team" of Claude Agent SDK agents that work together on a single business idea with one objective: **hit $1,000 MRR within 90 days**, using the Robbie/Ron playbook from `docs/How to Get an AI Agent to Make Money for You.pdf` as the operating manual.
+Turn this repo into a launcher for a small "virtual team" of Claude Agent SDK agents that work together on a single business idea with one objective: **collect $1,000 in pre-sales within 90 days**, using the Robbie/Ron playbook from `docs/How to Get an AI Agent to Make Money for You.pdf` as the operating manual.
+
+Pre-sales (not MRR) is the primary goal because it's concrete, happens on a specific day, and gives the crew a clean kill/pivot signal. Robbie had $6,170 in pre-sales by day 10 — $1K is the "minimum viable validation" threshold. If the crew can't get $1K in pre-sales by day 90, the business idea was wrong and we pivot. If it clears that bar, the crew can stretch toward MRR as a follow-on goal.
 
 You (the human) provide the goal and constraints. The agents decide everything else. They round-robin through rounds — each reads the shared project state, decides for itself what to do, writes it down. At the end of each round the Strategist commits something useful to the daily plan. You act as the human-in-the-loop: click buttons, enter credentials, record TikToks, and give yes/no on anything with real-world consequences.
 
@@ -10,7 +12,7 @@ You (the human) provide the goal and constraints. The agents decide everything e
 
 The whole lesson of the PDF is that Robbie didn't tell Ron what business to build — he gave Ron a budget and a deadline and got out of the way. Same rule here. Every agent, every turn, gets exactly two things:
 
-1. **The high-level goal** — from `brief.md`. $1K MRR in 90 days, the human's constraints, skills, budget.
+1. **The high-level goal** — from `brief.md`. $1K in pre-sales in 90 days, the human's constraints, skills, budget.
 2. **Where we are right now** — the state files (`plan.md`, `daily/*`, `decisions.md`, `metrics.md`, `backlog.md`, `questions.md`, any pasted `comments/*`).
 
 Plus a one-liner identifying which role they are ("you are the CTO"). That's it. No turn checklists, no mandated output shapes, no scoring rubrics, no "round 1 does X, round 2 does Y" scripts.
@@ -59,7 +61,7 @@ Each role is an **identity** (a lens), not a job description:
 
 | Role | The lens |
 |---|---|
-| **Strategist** (CEO) | Is this the right business? Are we closer to $1K MRR than yesterday? What should we stop doing? |
+| **Strategist** (CEO) | Is this the right business? Are we closer to $1K in pre-sales than yesterday? What should we stop doing? |
 | **CTO** | What would engineering leverage change about this business? What's feasible vs. fantasy? Build, buy, or skip? |
 | **Marketer** | Would a human stop scrolling for this? Where's the audience, what's the hook, what's the story? |
 | **Analyst** | What does the evidence say? Who else is doing this, at what price, with what result? What's the market actually telling us? |
