@@ -1,5 +1,5 @@
 import { env } from './env';
-import { getUpdates, sendMessage } from './telegram';
+import { editMessage, getUpdates, sendMessage } from './telegram';
 import { generateFunnyReply } from './ai';
 
 async function skipBacklog(): Promise<number> {
@@ -21,13 +21,23 @@ async function main() {
                         if (String(msg.chat.id) !== env.telegramChatId) continue;
 
                         console.log(`You: ${msg.text}`);
+                        const processingId = await sendMessage(msg.chat.id, 'processing...').catch(() => null);
                         try {
                               const reply = await generateFunnyReply(msg.text);
                               console.log(`Bot: ${reply}`);
-                              await sendMessage(msg.chat.id, reply);
+                              if (processingId !== null) {
+                                    await editMessage(msg.chat.id, processingId, reply);
+                              } else {
+                                    await sendMessage(msg.chat.id, reply);
+                              }
                         } catch (err) {
                               console.error('Failed to handle message:', err);
-                              await sendMessage(msg.chat.id, 'Something broke on my end. Try again.').catch(() => {});
+                              const errText = 'Something broke on my end. Try again.';
+                              if (processingId !== null) {
+                                    await editMessage(msg.chat.id, processingId, errText).catch(() => {});
+                              } else {
+                                    await sendMessage(msg.chat.id, errText).catch(() => {});
+                              }
                         }
                   }
             } catch (err) {
