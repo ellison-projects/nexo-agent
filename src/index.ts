@@ -10,6 +10,7 @@ async function skipBacklog(): Promise<number> {
 async function main() {
       let offset = await skipBacklog();
       console.log(`Listening for Telegram messages from chat ${env.telegramChatId}...`);
+      await sendMessage(Number(env.telegramChatId), 'bot started up 🚀').catch(() => {});
 
       while (true) {
             try {
@@ -21,7 +22,7 @@ async function main() {
                         if (String(msg.chat.id) !== env.telegramChatId) continue;
 
                         console.log(`You: ${msg.text}`);
-                        const processingId = await sendMessage(msg.chat.id, 'processing...').catch(() => null);
+                        const processingId = await sendMessage(msg.chat.id, 'working bro').catch(() => null);
                         try {
                               const reply = await generateFunnyReply(msg.text);
                               console.log(`Bot: ${reply}`);
