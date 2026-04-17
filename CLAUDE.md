@@ -31,6 +31,8 @@ Four small files, each a single responsibility:
 
 When the user says a single word like "restart", "logs", "reset", "status" etc., first check `package.json` scripts — it's almost always a reference to one of those. If there's no obvious match or multiple plausible ones, ask before acting.
 
+When the user asks you to run a command, state the exact command you're about to run **before** invoking it, so they can catch a misinterpretation before it executes.
+
 ## Runtime constraints worth knowing
 
 - **Single-instance only.** `ecosystem.config.cjs` pins `instances: 1, exec_mode: 'fork'`, and `npm run restart` `pkill`s stray `tsx` processes first. Two bots polling the same `getUpdates` offset will duplicate replies and fight over `.session-id`.
