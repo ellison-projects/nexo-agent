@@ -32,7 +32,7 @@ repo root/
 │   └── state.ts                    # read/write helpers for the project state files
 └── roles/
     ├── strategist/ROLE.md          # CEO — owns the plan, picks direction, reads market signals
-    ├── engineer/ROLE.md            # Software engineer — writes code, builds products/scripts/integrations
+    ├── cto/ROLE.md                 # CTO — tech strategy, feasibility, code; peer to Strategist
     ├── marketer/ROLE.md            # Content — TikTok scripts, hooks, posting schedule
     └── analyst/ROLE.md             # Research — comment mining, competitor scans, demand signals
 ```
@@ -46,18 +46,18 @@ Mapped directly to what the PDF says the work is:
 | Role | Owns | Typical turn output |
 |---|---|---|
 | **Strategist** (CEO) | `plan.md`, picking the business, 90-day targets, pivots | Updates plan; reconciles conflicts between other roles; picks what ships next |
-| **Software Engineer** | Actual code — vibe-coded apps, SaaS, scrapers, landing pages, scripts. Also: code-level infra (Dockerfiles, deploy configs, API integrations) | Commits to a `build/` subfolder in the project; tech decisions; open source/lib picks |
+| **CTO** | Technical strategy + code. Feasibility calls, build-vs-buy, where code gives leverage, tech-stack picks, and actually writing the code when it's code-time | Pushes back on Strategist when an idea is infeasible or when code could 10x it; tech roadmap; commits to `build/`; picks libraries/platforms |
 | **Marketer** (Content) | TikTok/Reels/Shorts scripts, hooks, posting cadence | Video briefs; 5-video content calendar; cross-post plan |
 | **Analyst** (Research) | Comment mining, competitor scans, audience demand signals | "Top 3 demand signals from today's comments"; pricing benchmarks; pivot recommendations |
 
-The Software Engineer writes code — not the same as clicking around in Stripe or signing up for Gumroad. No-code platform setup (Stripe dashboard, Gumroad, Discord, Skool) stays with the human, as it does in the PDF; whichever role needs it recommends the platform and the human does the signup.
+The CTO is a peer to the Strategist, not a downstream executor. The Strategist says "what business"; the CTO says "here's the engineering leverage that changes the shape of that business" — e.g., "a scraper would turn this from a service into a product," or "don't build this, Gumroad already does it." No-code platform signups (Stripe dashboard, Discord, Skool) still stay with the human per the PDF; the CTO picks the platform, the human signs up.
 
 ## Round-robin loop
 
 A **round** is one pass through all roles. A **cycle** is one full day's worth of rounds (default: 1 round/day, configurable).
 
 ```
-for each role in [strategist, engineer, marketer, analyst]:
+for each role in [strategist, cto, marketer, analyst]:
   1. load brief.md + state/*.md + last N transcripts
   2. prompt the role: "Here's the state. Here's your job. What do you change / add / recommend?"
   3. let the agent use Edit/Write on files under state/ (scoped via cwd)
@@ -68,37 +68,56 @@ then (synthesis step):
      and writes state/daily/YYYY-MM-DD.md — the concrete plan for the human tomorrow
 ```
 
-Why round-robin and not parallel: sequential turns mean each role reacts to the previous role's edits. The Marketer sees what the Engineer just decided to ship; the Strategist synthesizes at the end. Parallel runs would race on file edits and produce incoherent plans.
+Why round-robin and not parallel: sequential turns mean each role reacts to the previous role's edits. The Marketer sees what the CTO just decided to ship; the Strategist synthesizes at the end. Parallel runs would race on file edits and produce incoherent plans.
 
 Why Strategist closes the round: matches the PDF's framing — the human's one real job is saying yes/no, and the Strategist's job is to tee up that decision.
 
 ## The daily plan contract
 
-Every round ends by writing `state/daily/YYYY-MM-DD.md` with a fixed shape so it's scannable on a phone:
+Each role takes its turn, then the Strategist closes the round by writing `state/daily/YYYY-MM-DD.md`. The core artifact is a **ranked Top-10** — the crew's best options for today, with rationale. You pick 1–3 to execute.
+
+What the Top-10 *is* changes with the project phase:
+
+| Phase | What the Top-10 ranks |
+|---|---|
+| Week 1 — Discovery | Business ideas the crew thinks can hit $1K MRR in 90 days |
+| Week 2 — Validation | TikTok hooks to test / demand-signal experiments |
+| Week 3 — Pre-sell | Product features, pricing tiers, pre-sell page angles |
+| Week 4+ — Build/fulfill | Shipped features, growth experiments, pivot candidates, content angles |
+
+Fixed shape so it's scannable on a phone:
 
 ```markdown
 # Day <N> of 90 — YYYY-MM-DD
 
 ## Current MRR: $X   Pre-orders: N   Followers: N
 
-## What the crew decided today
-- <one-line bullets, max 5>
+## Top 10 Plays (ranked)
+1. **<title>** — score: X/10 — proposed by: <role>
+   why it's #1: <one line>
+   what it costs you: <time/money/risk>
+2. **<title>** — score: X/10 — proposed by: <role>
+   ...
+(through 10)
 
-## What YOU need to do (human-in-the-loop)
-- [ ] <task> — why: <...>
-- [ ] <task> — why: <...>
+## The crew's pick for today
+The Strategist recommends #<N>. Here's why over #<M>: <one line>.
 
-## What the crew will work on next round
-- Strategist: ...
-- Engineer: ...
-- Marketer: ...
-- Analyst: ...
+## What YOU need to do to run the pick
+- [ ] <task>
+- [ ] <task>
 
 ## Open questions for you
 1. ...
 ```
 
-If the daily plan ever grows past one screen, we've lost the plot. Enforce that in the synthesis prompt.
+Ranking rules for the Strategist's synthesis:
+- Score 1–10 on a single axis: *"probability this gets us closer to $1K MRR in the next 7 days."*
+- Each role must propose at least 2 ideas; Strategist can add its own and must rank all of them.
+- No ties. Force a call.
+- Ideas carry forward — if idea #4 from yesterday still makes sense, it can rerank today; if it got stale, it drops off. `plan.md` tracks which ideas have been tried, shipped, or killed.
+
+If the daily plan grows past one phone screen above the Top-10 list, we've lost the plot. Enforce that in the synthesis prompt.
 
 ## CLI
 
@@ -120,8 +139,8 @@ Each role gets its **own** `.session-id` file (e.g. `projects/<slug>/state/.sess
 Mirror `src/ai.ts`:
 - `permissionMode: 'bypassPermissions'`, `allowDangerouslySkipPermissions: true`
 - `cwd: projects/<slug>/` — sandbox each agent to its project directory so it can't accidentally edit the repo's source
-- `settingSources: ['project', 'user', 'local']` — lets us drop per-role `.claude/settings.json` later if a role needs custom tools (e.g. Analyst gets web fetch, Engineer gets shell)
-- Allow Read/Edit/Write/Glob/Grep by default. Deny Bash by default except for Engineer, and even there scope it.
+- `settingSources: ['project', 'user', 'local']` — lets us drop per-role `.claude/settings.json` later if a role needs custom tools (e.g. Analyst gets web fetch, CTO gets shell)
+- Allow Read/Edit/Write/Glob/Grep by default. Deny Bash by default except for CTO, and even there scope it.
 
 ## What the human does
 
@@ -135,13 +154,13 @@ Matching the PDF's "human in the loop" framing:
 
 ## Open questions for the user
 
-1. ~~**Number of roles**~~ — **decided: 4** (Strategist / Software Engineer / Marketer / Analyst).
-2. **Model per role** — all Sonnet, or give Strategist Opus and the rest Sonnet? Opus everywhere = expensive but probably worth it given the whole premise is "AI is the employee."
-3. **Round cadence** — 1 round/day (matches PDF's daily posting rhythm) or run multiple rounds on big days (launch, pivot)? Default 1/day.
-4. **Comment ingestion** — for now, human pastes exported comments into a file. Robbie used Apify. Do we wire Apify/TikTok scraping into the Analyst later, or keep it manual to stay simple?
-5. **Where does `projects/` live** — inside the repo (gitignored) or outside (e.g. `~/biz/`)? Gitignored-inside is simplest for v1.
+1. ~~**Number of roles**~~ — **decided: 4** (Strategist / CTO / Marketer / Analyst).
+2. ~~**Model per role**~~ — **decided: Opus for all four.** The whole premise is "AI is the employee" — no point picking a cheaper brain for the employees.
+3. ~~**Round cadence**~~ — **decided: 1 round/day.** Each role takes a turn, Strategist closes with the Top-10, commit, done. Multiple rounds allowed on-demand via `--rounds N` but 1/day is the rhythm.
+4. **Comment ingestion** — when you post TikToks, comments are where demand signal lives (the PDF's Step 4 is the whole business). "Ingestion" = how those comments get into the Analyst's hands. Two options: (a) you manually paste/export them into `projects/<slug>/state/comments/YYYY-MM-DD.txt` each day, or (b) we wire in Apify (Robbie's tool) to scrape them automatically. Start with manual to stay simple; add Apify once you have enough videos posting to make it worth it.
+5. ~~**Where does `projects/` live**~~ — **decided: inside the repo, gitignored.** One less thing to configure.
 6. **Telegram integration** — should the existing bot become the mobile UI for the crew (`/crew status`, `/crew run`, daily plan pushed as a Telegram message)? Probably yes, but as a v2 — ship the CLI first.
-7. **TikTok/Stripe/Gumroad credentials** — the agents will propose these actions but the human signs up. Confirmed, or do we want the Engineer to have any browser-automation ability at some point?
+7. **TikTok/Stripe/Gumroad credentials** — the agents will propose these actions but the human signs up. Confirmed, or do we want the CTO to have any browser-automation ability at some point?
 
 ## Non-goals (for v1)
 
