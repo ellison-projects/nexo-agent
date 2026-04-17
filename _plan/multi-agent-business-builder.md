@@ -31,17 +31,13 @@ The existing bot (`src/index.ts`, `src/ai.ts`, `src/telegram.ts`) is a single-ag
 repo root/
 ├── projects/                       # one subfolder per business experiment (gitignored or user-owned)
 │   └── <slug>/                     # e.g. projects/fiverr-swot/
-│       ├── brief.md                # human-written: what the business is, budget, constraints
-│       ├── state/
-│       │   ├── plan.md             # the living 90-day plan (agents edit this)
-│       │   ├── daily/YYYY-MM-DD.md # one file per round — the day's plan
-│       │   ├── decisions.md        # append-only log of decisions + who proposed them
-│       │   ├── metrics.md          # MRR, pre-orders, followers, churn — human-updated
-│       │   ├── backlog.md          # open tasks, blockers, questions for the human
-│       │   ├── questions.md        # agent-to-agent questions queue (see "Escape hatch")
-│       │   ├── session-log.md      # per-round stamp: rounds, wall-clock, token spend
-│       │   └── comments/YYYY-MM-DD.txt  # (later) pasted TikTok comments for the Analyst
-│       └── transcripts/            # raw per-turn agent output, one file per turn
+│       ├── brief.md                # human input: goal + constraints (written once, rarely edited)
+│       ├── working.md              # THE single working doc — all agents read & edit this
+│       ├── questions.md            # async cross-role question queue (see "Escape hatch")
+│       ├── daily/YYYY-MM-DD.md     # round-closing snapshot for the human (phone-sized)
+│       ├── comments/YYYY-MM-DD.txt # human-pasted TikTok comments (when applicable)
+│       ├── session-log.md          # per-round stamp: rounds, wall-clock, token spend
+│       └── transcripts/            # raw per-turn agent output (forensic, not working state)
 ├── src/crew/
 │   ├── run.ts                      # CLI entrypoint: `npm run crew -- --project <slug>`
 │   ├── roles.ts                    # role registry (name, system prompt, output contract)
@@ -158,46 +154,80 @@ The only hard constraint is **fit on one phone screen**. If the Strategist can't
 
 Across the project, the daily files accumulate in `daily/`. Read day 1 + day 7 + day 30 in a row and you see the trajectory.
 
+## The working doc (`working.md`)
+
+One doc. Every agent reads and edits it. It's the brain of the project.
+
+There's exactly **one structural rule**: the top of `working.md` always has a short section called **"Where we are / pick up here"** that any agent can read in 30 seconds to know exactly where the project stands and what the next agent should do. Every agent that takes a turn must leave this section accurate before they finish. That's the handoff primitive — without it, round 20 doesn't know what round 19 did.
+
+Below that section, the agents decide what lives in the doc. Likely sections that emerge naturally: the live 90-day plan, a decisions log, metrics, ideas, blockers for the human, open threads. But we don't prescribe them — if the crew decides a different structure works better, fine.
+
+Sketch of what `working.md` might look like by round 20:
+
+```markdown
+# Working doc — my-biz
+
+## Where we are / pick up here
+Round 20, 2026-04-18 05:12. We're locked on "AI-generated TikTok
+hooks for Shopify stores" as the business. Pre-sell page is drafted
+(see section below). CTO is next — needs to finalize Stripe Payment
+Link integration. Marketer already wrote the launch video script.
+Blocker: human hasn't confirmed $29 price point yet (question in
+questions.md).
+
+## The 90-day plan
+...
+
+## Decisions
+- 2026-04-17 pivoted from SWOT to TikTok hooks — Strategist, round 8
+- ...
+
+## Metrics (human-updated)
+MRR: $0   Pre-orders: 0   TikTok followers: 0
+
+## Open for the human
+- [ ] Confirm $29 price point
+- [ ] Sign up for Stripe
+- [ ] Record launch TikTok (script in "Content" section below)
+
+## (other sections as the crew sees fit)
+```
+
 ## Cold start: what happens the first time you run this
 
-You just filled out `brief.md` and typed `npm run crew -- run my-biz`. The Strategist is about to take turn 1 of round 1. Here's exactly what it sees and what it does.
+You just filled out `brief.md` and typed `npm run crew -- run my-biz`. The Strategist is about to take turn 1 of round 1.
 
-**What the Strategist knows going in:**
+**What it knows going in:**
 
-1. **The goal** — the full contents of `brief.md`. At minimum: "$1K MRR in 90 days, budget $X, here's my skills, here's what I'm willing and not willing to do."
-2. **The state** — which on turn 1 is nearly empty. `plan.md` doesn't exist. `daily/` is empty. `metrics.md` shows zeros. `decisions.md` is empty. `questions.md` is empty. `comments/` is empty.
-3. **Its identity** — one-line system prompt: "You are the Strategist. Your lens: is this the right business? Are we closer to $1K MRR than yesterday? What should we stop doing?"
-4. **The playbook** — `docs/How to Get an AI Agent to Make Money for You.pdf` is accessible in the session context as reference material. Every agent can read it.
-5. **Round context** — "You are turn 1 of round 1. This is a fresh project."
+1. **The goal** — full contents of `brief.md` (your $1K target, budget, skills, constraints).
+2. **The state** — on turn 1, just `working.md` with an empty "Where we are" section and nothing else. Everything else (daily/, comments/, questions.md) is empty too.
+3. **Its identity** — one-line system prompt: "You are the Strategist. Your lens: is this the right business? Are we closer to the goal than yesterday? What should we stop doing?"
+4. **The playbook** — the PDF is accessible as reference material.
+5. **Round context** — "turn 1 of round 1 of a fresh project."
 
-**What it likely produces** (not mandated — this is the prediction, not the contract):
+**What it likely does** (not mandated):
 
-- Creates `plan.md` with a first-pass 90-day plan
-- Logs an entry in `decisions.md` about the initial direction
-- Maybe appends clarifying questions to `questions.md` for the CTO/Marketer/Analyst
-- Maybe adds questions for the human to `backlog.md`
+- Writes a first pass of the 90-day plan into `working.md`
+- Fills in the "Where we are / pick up here" section so the CTO knows where to start
+- Maybe opens a question in `questions.md` for the CTO/Marketer/Analyst
+- Maybe adds a "Open for the human" section with clarifying questions
 
-**What it definitely produces** (infrastructure):
+**What it definitely does** (infra):
 
-- A transcript at `transcripts/<timestamp>-strategist.md` with its reasoning and file-diff summary
-- Updated `state/session-log.md` with rounds/tokens spent
+- A transcript at `transcripts/<timestamp>-strategist.md` with its reasoning + file diff
+- An entry in `session-log.md` with round/turn/token spend
 
-Then turn 2 fires: the CTO opens, reads everything the Strategist just wrote, takes its turn. Then Marketer. Then Analyst. Then the Strategist closes the round by writing `daily/<today>.md`. That's round 1. Then round 2 starts from the new state.
+Then CTO's turn opens `working.md`, reads "Where we are," takes its turn, updates "Where we are" before finishing. Same for Marketer. Same for Analyst. Then Strategist's round-closing turn writes `daily/<today>.md` — a phone-sized snapshot for you — and updates "Where we are" one more time. Round 2 starts from that state.
 
 ## Tracking progress
 
-Progress lives in the state files — no separate dashboard. Four sources, each answering a different question:
+Three signals, in order of importance:
 
-| File | Answers |
-|---|---|
-| `daily/YYYY-MM-DD.md` | "What's the crew's best thinking today?" — one per round-closing (last overwrite wins each day) |
-| `metrics.md` | "Are the numbers moving?" — MRR, pre-orders, followers, churn. Human updates after real-world events. |
-| `decisions.md` | "What did we commit to, when, and why?" — append-only log |
-| `plan.md` | "How has the 90-day plan evolved?" — `git log` this file for the trajectory |
+1. **Is something real happening in the world?** Did a TikTok get posted? Did a pre-order come in? If yes, `working.md`'s Metrics section moves. If a week goes by and it hasn't, the crew is spinning — rewrite the brief or role identities.
+2. **Daily files.** Read `daily/day-1.md`, `daily/day-7.md`, `daily/day-30.md` in a row. If the trajectory is muddled, the Strategist's synthesis isn't working.
+3. **Working doc history.** `git log projects/<slug>/working.md` shows the arc of what changed and when. `git diff` between two commits shows exactly what pivoted.
 
-Plus `transcripts/` for forensic detail if you want to know why a decision happened.
-
-The real progress signal is **"is something real happening in the world?"** Not "did the plan get more words." If after a week `metrics.md` is still all zeros and nothing got posted/shipped/sold, the crew is spinning and you rewrite the brief or the role identities.
+Transcripts are forensic — only open them when something went wrong and you need to know why.
 
 ## CLI
 
@@ -235,9 +265,9 @@ Matching the PDF's "human in the loop" framing:
 
 1. `npm run crew -- init my-biz` and fill in `brief.md` (idea, budget, constraints, skills).
 2. At ~11pm: `npm run crew -- run my-biz` on the VPS, disconnect SSH. Morning: read the daily plan, do the checkboxed tasks.
-3. Update `metrics.md` with real numbers (MRR, pre-orders, follower count, top comments).
-4. Record the TikTok the Marketer scripted. Post it. Paste comment exports back into a `state/comments/YYYY-MM-DD.txt` file for the Analyst to chew on next round.
-5. Say yes/no on decisions the Strategist teed up.
+3. Update the Metrics section at the top of `working.md` with real numbers (MRR, pre-orders, follower count).
+4. Record the TikTok the Marketer scripted. Post it. Paste comment exports into `projects/<slug>/comments/YYYY-MM-DD.txt` for the Analyst to chew on next session.
+5. Say yes/no on decisions the Strategist teed up. You can edit `working.md` directly if it's easier — just say "HUMAN:" before anything you add so the crew knows it's from you.
 
 ## Decisions & open questions
 
@@ -247,7 +277,8 @@ Matching the PDF's "human in the loop" framing:
 - **Model**: Opus for all four.
 - **Run shape**: 11pm trigger → detached process → many rounds back-to-back overnight. Each round: all 4 agents take a turn, each challenging prior turns before contributing. Stops at `--until 07:00` / `--budget $20` / `--rounds 30` / convergence, whichever first.
 - **`projects/` location**: inside the repo, gitignored.
-- **Comment ingestion (v1)**: manual — you paste TikTok comments into `projects/<slug>/state/comments/YYYY-MM-DD.txt` before triggering the run. Apify integration is a v2 concern.
+- **Comment ingestion (v1)**: manual — you paste TikTok comments into `projects/<slug>/comments/YYYY-MM-DD.txt` before triggering the run. Apify integration is a v2 concern.
+- **Single working doc**: instead of multiple separate state files (`plan.md` / `decisions.md` / `metrics.md` / `backlog.md`), everything lives in one `working.md` per project, with a mandatory "Where we are / pick up here" section at the top that every agent updates before finishing its turn. `questions.md` and `daily/*.md` stay separate because they serve different purposes (cross-role protocol, human-facing snapshot).
 - **Round-robin, not parallel**: all 4 agents run sequentially, one turn at a time, with a `questions.md` escape hatch for cross-role clarifying questions. Parallel-with-async-messaging was considered and rejected for v1 — it buys you coordination complexity (file races, deadlocks, runaway chatter, non-deterministic replay) against a benefit the CHALLENGE beat already provides. Revisit only if `questions.md` piles up unresolved round-over-round.
 
 ### Still open
