@@ -1,10 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(claude --version)",
-      "Bash(claude --print --model sonnet --permission-mode bypassPermissions)",
-      "Bash(git -C /root/code/nexo-agent remote -v)",
-      "Bash(awk 'NR==5116 { for\\(i=1;i<=length\\($0\\);i+=500\\) print substr\\($0,i,500\\) }' /root/code/nexo-agent/node_modules/@anthropic-ai/claude-agent-sdk/cli.js)"
+      "Bash(*)"
     ]
   },
   "enabledMcpjsonServers": [

@@ -22,7 +22,7 @@ async function main() {
                         if (String(msg.chat.id) !== env.telegramChatId) continue;
 
                         console.log(`You: ${msg.text}`);
-                        const processingId = await sendMessage(msg.chat.id, 'working bro').catch(() => null);
+                        const processingId = await sendMessage(msg.chat.id, '....').catch(() => null);
                         try {
                               const reply = await generateFunnyReply(msg.text);
                               console.log(`Bot: ${reply}`);
