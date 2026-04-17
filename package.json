@@ -7,7 +7,8 @@
     "stop": "pm2 stop telegram-bot",
     "restart": "pkill -f 'tsx.*src/index.ts' || true && pm2 restart telegram-bot",
     "logs": "pm2 logs telegram-bot",
-    "status": "pm2 status"
+    "status": "pm2 status",
+    "reset-session": "rm -f .session-id && npm run restart"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.59"
