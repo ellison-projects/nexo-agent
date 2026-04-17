@@ -24,7 +24,7 @@ Four small files, each a single responsibility:
 - `src/telegram.ts` — thin `fetch` wrapper over the Telegram Bot API (`sendMessage`, `editMessage`, `getUpdates`). No SDK.
 - `src/ai.ts` — wraps `@anthropic-ai/claude-agent-sdk`'s `query()`. Two things that matter:
   - **Session persistence.** The `session_id` returned on each `result` message is written to `.session-id` (gitignored) and passed as `resume` on the next call. This is what lets the bot remember prior Telegram turns across process restarts. If you change the message-handling flow, preserve this write.
-  - **Agent permissions.** Runs with `permissionMode: 'bypassPermissions'`, `allowDangerouslySkipPermissions: true`, `cwd: /root/code/nexo-agent`, and `settingSources: ['project', 'user']` — the agent reads this repo's `.claude/` config and can freely use Read/Glob/Grep. The system prompt frames it as a dev-support teammate.
+  - **Agent permissions.** Runs with `permissionMode: 'bypassPermissions'`, `allowDangerouslySkipPermissions: true`, `cwd: /root/code/nexo-agent`, and `settingSources: ['project', 'user', 'local']` — the agent reads this repo's `.claude/` config and can freely use Read/Glob/Grep. The system prompt frames it as a dev-support teammate.
 - `src/env.ts` — fails fast on missing `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`.
 
 ## Interpreting short commands from the user

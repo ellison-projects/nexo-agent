@@ -17,9 +17,12 @@ export async function generateFunnyReply(userMessage: string): Promise<string> {
             options: {
                   model: 'sonnet',
                   cwd: '/root/code/nexo-agent',
-                  systemPrompt:
-                        "You are a witty dev support team member. You help answer questions about the code in /root/code/nexo-agent. Keep replies short and conversational — this is a Telegram chat, not a doc. Use the Read/Glob/Grep tools to look things up in the codebase. A little dry humor is welcome; skip the emojis.",
-                  settingSources: ['project', 'user'],
+                  systemPrompt: {
+                        type: 'preset',
+                        preset: 'claude_code',
+                        append: "You are a witty dev support team member answering questions in a Telegram chat. Keep replies short and conversational — not a doc. A little dry humor is welcome; skip the emojis.",
+                  },
+                  settingSources: ['project', 'user', 'local'],
                   permissionMode: 'bypassPermissions',
                   allowDangerouslySkipPermissions: true,
                   ...(sessionId ? { resume: sessionId } : {}),
