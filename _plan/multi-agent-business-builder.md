@@ -84,7 +84,7 @@ That's the whole role definition. `roles/<role>/ROLE.md` holds the same thing in
 
 ## Round-robin loop
 
-A **round** is one pass through all four roles plus a synthesis step. A **session** is however many rounds run back-to-back before the command exits — typically one overnight batch.
+A **round** is one pass through all four roles plus a synthesis step. A **session** is however many rounds run back-to-back before the command exits — typically a ~30-minute batch before bed.
 
 ```
 for each role in [strategist, cto, marketer, analyst]:
@@ -123,13 +123,13 @@ Why round-robin and not parallel: sequential turns mean each role reacts to the 
 
 Why Strategist closes the round: matches the PDF's framing — the human's one real job is saying yes/no, and the Strategist's job is to tee up that decision.
 
-## Overnight run mode (primary use case)
+## Run mode (primary use case)
 
-The intended flow: **11pm you SSH in, start the crew, disconnect, wake up to a finished Top-10.** Everything below flows from that.
+The intended flow: **11pm you SSH in, start the crew, brush your teeth, go to bed. It's done within 30 minutes.** Everything below flows from that.
 
 ### Detachment
 
-`npm run crew -- run <slug> --until 07:00` launches through pm2 as a one-off process (`pm2 start ... --no-autorestart`), which means it survives SSH disconnect and shows up in `pm2 list` for inspection. A second invocation while one is already running refuses to start — same single-instance rule as the bot.
+`npm run crew -- run <slug>` launches through pm2 as a one-off process (`pm2 start ... --no-autorestart`), which means it survives SSH disconnect and shows up in `pm2 list` for inspection. A second invocation while one is already running refuses to start — same single-instance rule as the bot.
 
 Alternative if pm2 feels heavy for a one-off: `nohup npm run crew ... > log 2>&1 &` in a `tmux` session. Whichever we pick, the CLI abstracts it: user always types `npm run crew -- run`.
 
@@ -137,9 +137,10 @@ Alternative if pm2 feels heavy for a one-off: `nohup npm run crew ... > log 2>&1
 
 Whichever triggers first:
 
-- `--until HH:MM` — wall-clock deadline (default: 07:00 local)
-- `--rounds N` — hard cap on round count (default: 30)
-- `--budget $X` — token-cost ceiling (default: $20/session); tallied from the SDK's usage events
+- `--duration 30m` — wall-clock duration from start (default: **30 minutes**). Primary knob.
+- `--until HH:MM` — optional: wall-clock deadline instead of duration (for longer runs)
+- `--rounds N` — hard cap on round count (default: 15 — fits comfortably in 30m)
+- `--budget $X` — token-cost ceiling (default: $5/session, conservative for a 30m run); tallied from the SDK's usage events
 - **Confidence converged**: every one of the 4 agents rates the current top pick ≥80% likely to hit the goal, each with a one-line reason
 
 All four are ORed. Any one trips, session exits clean, final daily plan stays on disk.
@@ -182,15 +183,57 @@ If both yes → converged, exit. If either no → run another round. Agents aren
 
 Guardrail against agreement theater: each turn must include both a number and a one-line reason. A vague reason (e.g. "feels good") gets bounced back by the runner — same role re-runs that turn beat with "be specific."
 
-### Cost to expect
+### Cost safety
 
-Rough back-of-napkin: 4 roles × ~30s Opus turn × 20 rounds ≈ $5–$15/session depending on context growth. The `--budget $X` cap is the hard guardrail. Worth logging cumulative spend in `state/session-log.md` after every round so you can see where it went.
+It's your money, and you're about to be asleep. Layered defenses:
+
+**Hard ceilings** (session exits when any trips, whichever comes first):
+- `--duration 30m` — default **30 minutes** from start. Primary ceiling. At ~45s per Opus turn × 4 agents = ~3 minutes per round, so ~10 rounds realistic per session.
+- `--budget $5` — conservative token-cost cap; raise once you have session data.
+- `--rounds 15` — round cap.
+- Confidence converged (all 4 roles ≥80%) — the common path to exit early.
+
+**Graceful kill**: when duration/budget/rounds trips, the runner lets the current agent turn finish, writes `daily/<date>.md`, then exits. Hard `SIGKILL` only if graceful exit doesn't return within 2 more minutes.
+
+**Worst-case math**: 4 roles × 15 rounds × ~$0.15/Opus turn ≈ $9 hard absolute ceiling. Budget cap makes it $5. With a 30-minute wall-clock, even pathological token bloat can't outrun the clock.
+
+**Pre-flight** (before round 1 runs):
+```
+$ npm run crew -- run my-biz
+Starting session for my-biz
+Model: Opus  Duration cap: 30m  Budget cap: $5
+Estimated spend range: $1–$4 (based on 4 roles × likely 5–10 rounds to convergence)
+Hard ceiling: 30m OR 15 rounds OR $5
+Starting in 10s... (ctrl-C to abort)
+```
+
+**Live monitoring** — `npm run crew -- status my-biz` from your phone shows current spend, round count, and time remaining. Same session as whoever triggered it (pm2 tracks it).
+
+**Phone alerts** (v1 exception to "no Telegram integration" — safety rails are worth it): reuse the existing bot to send you a Telegram message at:
+- Session start (so you can confirm it's running)
+- 75% budget burned (early warning)
+- Session end (spend, rounds, convergence status)
+
+**Emergency kill** — `npm run crew -- stop my-biz` is instant. Also reachable by replying `stop my-biz` to the Telegram alert, if we wire that up.
+
+**Per-turn `maxTurns` cap** (SDK-level): each agent's `query()` call gets `maxTurns: 8`, so a single turn can use at most 8 tool-use iterations before the SDK returns. Prevents an agent from getting stuck in a Read → Edit → Read → Edit loop. 8 is plenty for "read state, think, write a few files, done."
+
+**Context trimming** (keeps per-turn cost from ballooning round-over-round): an agent's prompt only loads the last N entries of its own `notes/<role>.md`, not the full history. `working.md` is loaded in full but is size-capped (rejected if > ~10K tokens; crew instructed to keep it tight). Older notes entries get summarized by the agent itself when their file grows past the threshold.
+
+**Daily cap** — config option in `brief.md`: `max_sessions_per_day: 1`. Prevents accidental double-triggers from doubling your spend.
+
+All of this is also mirrored into `session-log.md` per round so you can audit where the money went.
+
+**If you're using a Claude Max subscription** (like Robbie): there's no per-token bill. The `--budget` cap becomes less important, but rate limits matter more. In that case the real risk isn't money — it's burning through your daily Claude allowance and locking yourself out of Claude for your own dev work (including the Telegram bot). Safer defaults with a Max subscription:
+- Leave `--duration 30m` and `--rounds 15` as primary ceilings; they're the meaningful ones.
+- Monitor for 429 rate-limit errors from the SDK — on a 429, pause 30s and retry. If three 429s in a row, exit the session cleanly.
+- Still run `--foreground` for the first 1–2 sessions so you can see how fast you're burning allowance before letting it run detached.
 
 ### What you see in the morning
 
 ```
 $ npm run crew -- status my-biz
-Session: 2026-04-17 23:04 → 2026-04-18 05:32 (6h28m, 18 rounds, $9.40)
+Session: 2026-04-17 23:04 → 2026-04-17 23:27 (23m, 8 rounds, $2.80)
 Status: completed (confidence converged — all agents ≥80%)
 Today's plan: projects/my-biz/daily/2026-04-18.md
 
@@ -293,7 +336,7 @@ Then CTO's turn opens `working.md`, reads "Where we are," takes its turn, update
 
 ## Day 1 outcome (what "good" looks like)
 
-After one overnight session, `daily/day-1.md` should contain a **ranked top 3 with a clear crew recommendation** — sharp enough that the human can approve #1 and start executing Day 2 in 30 minutes, or redirect to #2/#3 without starting over.
+After one ~30-minute session, `daily/day-1.md` should contain a **ranked top 3 with a clear crew recommendation** — sharp enough that the human can approve #1 and start executing Day 2 in 30 minutes, or redirect to #2/#3 without starting over.
 
 Four parts:
 
@@ -362,17 +405,18 @@ Transcripts are forensic — only open them when something went wrong and you ne
 
 ```
 npm run crew -- init <slug>                          # scaffold projects/<slug>/
-npm run crew -- run <slug>                           # overnight run: default --until 07:00, --budget $20
-npm run crew -- run <slug> --until 07:00             # stop at wall-clock time
+npm run crew -- run <slug>                           # detached run: default --duration 30m, --rounds 15, --budget $5
+npm run crew -- run <slug> --duration 60m            # longer duration (if you want more rounds)
+npm run crew -- run <slug> --until 07:00             # wall-clock deadline instead of duration
 npm run crew -- run <slug> --rounds 10               # stop after N rounds
-npm run crew -- run <slug> --budget 15               # stop at $ cap
+npm run crew -- run <slug> --budget 10               # stop at $ cap
 npm run crew -- run <slug> --foreground              # don't detach (for debugging)
 npm run crew -- status <slug>                        # latest daily plan, session state, spend
 npm run crew -- stop <slug>                          # kill a running session cleanly
 npm run crew -- tail <slug>                          # follow the current session's log
 ```
 
-Default `run` = "launch detached, run until 07:00 or $20 spent or 30 rounds, whichever first." That's the one command you type at 11pm.
+Default `run` = "launch detached, run for 30m or $5 spent or 15 rounds, whichever first." That's the one command you type at 11pm.
 
 Everything is file-based. No DB, no server.
 
@@ -393,7 +437,7 @@ Mirror `src/ai.ts`:
 Matching the PDF's "human in the loop" framing:
 
 1. `npm run crew -- init my-biz` and fill in `brief.md` (idea, budget, constraints, skills).
-2. At ~11pm: `npm run crew -- run my-biz` on the VPS, disconnect SSH. Morning: read the daily plan, do the checkboxed tasks.
+2. At ~11pm: `npm run crew -- run my-biz` on the VPS. 30 minutes later it's done. Morning: read the daily plan, do the checkboxed tasks.
 3. Update the Metrics section at the top of `working.md` with real numbers (MRR, pre-orders, follower count).
 4. Record the TikTok the Marketer scripted. Post it. Paste comment exports into `projects/<slug>/comments/YYYY-MM-DD.txt` for the Analyst to chew on next session.
 5. Say yes/no on decisions the Strategist teed up. You can edit `working.md` directly if it's easier — just say "HUMAN:" before anything you add so the crew knows it's from you.
@@ -404,7 +448,7 @@ Matching the PDF's "human in the loop" framing:
 
 - **4 roles**: Strategist / CTO / Marketer / Analyst.
 - **Model**: Opus for all four.
-- **Run shape**: 11pm trigger → detached process → many rounds back-to-back overnight. Each round: all 4 agents take a turn, each challenging prior turns before contributing. Stops at `--until 07:00` / `--budget $20` / `--rounds 30` / convergence, whichever first.
+- **Run shape**: 11pm trigger → detached process → ~30 minutes of rounds back-to-back. Each round: all 4 agents take a turn, each challenging prior turns before contributing. Stops at `--duration 30m` / `--budget $5` / `--rounds 15` / convergence, whichever first.
 - **`projects/` location**: inside the repo, gitignored.
 - **Comment ingestion (v1)**: manual — you paste TikTok comments into `projects/<slug>/comments/YYYY-MM-DD.txt` before triggering the run. Apify integration is a v2 concern.
 - **Single working doc**: instead of multiple separate state files (`plan.md` / `decisions.md` / `metrics.md` / `backlog.md`), everything lives in one `working.md` per project, with a mandatory "Where we are / pick up here" section at the top that every agent updates before finishing its turn. `questions.md` and `daily/*.md` stay separate because they serve different purposes (cross-role protocol, human-facing snapshot).
