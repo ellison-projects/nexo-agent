@@ -54,7 +54,7 @@ The CTO is a peer to the Strategist, not a downstream executor. The Strategist s
 
 ## Round-robin loop
 
-A **round** is one pass through all roles. A **cycle** is one full day's worth of rounds (default: 1 round/day, configurable).
+A **round** is one pass through all four roles plus a synthesis step. A **session** is however many rounds run back-to-back before the command exits — typically one overnight batch.
 
 ```
 for each role in [strategist, cto, marketer, analyst]:
@@ -64,13 +64,65 @@ for each role in [strategist, cto, marketer, analyst]:
   4. append its reasoning + file diff summary to transcripts/<timestamp>-<role>.md
 
 then (synthesis step):
-  5. Strategist agent runs a final "close the round" turn that reads the other three turns
-     and writes state/daily/YYYY-MM-DD.md — the concrete plan for the human tomorrow
+  5. Strategist agent runs a "close the round" turn that reads the other three turns
+     and rewrites state/daily/YYYY-MM-DD.md — the current best Top-10
 ```
+
+Each round overwrites the day's plan in place. If the session crashes at round 17, you still have round 16's plan waiting for you in the morning — it's not worse than no plan, it's just not fully cooked.
 
 Why round-robin and not parallel: sequential turns mean each role reacts to the previous role's edits. The Marketer sees what the CTO just decided to ship; the Strategist synthesizes at the end. Parallel runs would race on file edits and produce incoherent plans.
 
 Why Strategist closes the round: matches the PDF's framing — the human's one real job is saying yes/no, and the Strategist's job is to tee up that decision.
+
+## Overnight run mode (primary use case)
+
+The intended flow: **11pm you SSH in, start the crew, disconnect, wake up to a finished Top-10.** Everything below flows from that.
+
+### Detachment
+
+`npm run crew -- run <slug> --until 07:00` launches through pm2 as a one-off process (`pm2 start ... --no-autorestart`), which means it survives SSH disconnect and shows up in `pm2 list` for inspection. A second invocation while one is already running refuses to start — same single-instance rule as the bot.
+
+Alternative if pm2 feels heavy for a one-off: `nohup npm run crew ... > log 2>&1 &` in a `tmux` session. Whichever we pick, the CLI abstracts it: user always types `npm run crew -- run`.
+
+### Stop conditions
+
+Whichever triggers first:
+
+- `--until HH:MM` — wall-clock deadline (default: 07:00 local)
+- `--rounds N` — hard cap on round count (default: 30)
+- `--budget $X` — token-cost ceiling (default: $20/session); tallied from the SDK's usage events
+- Converged: 3 rounds in a row where the Strategist's synthesis flags "no material change to Top-10"
+
+All four are ORed. Any one trips, session exits clean, final daily plan stays on disk.
+
+### Why rounds need to evolve (the big design rule)
+
+If every round is just "re-propose the top 10," round 20 looks identical to round 2 and you've burned $15 for nothing. Each round must do *different work* than the last. The role prompts enforce this:
+
+- **Strategist**: round 1 proposes; rounds 2+ *stress-test* the current top 3 ("what would have to be true for #1 to fail by day 30?")
+- **CTO**: round 1 gives feasibility scores; rounds 2+ sketch implementation for the top 3 and let that refine the ranking
+- **Marketer**: round 1 drafts hooks; rounds 2+ writes the actual 30-second TikTok scripts for the top 3 and reads which script "wants" to be made — that feeds ranking
+- **Analyst**: round 1 surveys competitors; rounds 2+ goes deep on the top 3 — pricing, existing solutions, demand evidence
+
+By round ~10, the top 3 have been attacked from four angles. That's the whole point of running overnight vs. running once.
+
+### Cost to expect
+
+Rough back-of-napkin: 4 roles × ~30s Opus turn × 20 rounds ≈ $5–$15/session depending on context growth. The `--budget $X` cap is the hard guardrail. Worth logging cumulative spend in `state/session-log.md` after every round so you can see where it went.
+
+### What you see in the morning
+
+```
+$ npm run crew -- status my-biz
+Session: 2026-04-17 23:04 → 2026-04-18 06:47 (7h43m, 22 rounds, $11.80)
+Status: completed (hit --until)
+Today's plan: projects/my-biz/state/daily/2026-04-18.md
+
+Top pick: #3 — "Niche newsletter for CrossFit gym owners"
+Next step for you: see the 2 checkboxes at bottom of the daily plan.
+```
+
+One command, one paragraph, one file to open. That's the morning interface.
 
 ## The daily plan contract
 
@@ -122,13 +174,20 @@ If the daily plan grows past one phone screen above the Top-10 list, we've lost 
 ## CLI
 
 ```
-npm run crew -- init <slug>            # scaffold projects/<slug>/ from template
-npm run crew -- run <slug>             # run one full round (all 4 roles + synthesis)
-npm run crew -- run <slug> --rounds 3  # run N rounds back-to-back
-npm run crew -- status <slug>          # print latest daily plan + MRR
+npm run crew -- init <slug>                          # scaffold projects/<slug>/
+npm run crew -- run <slug>                           # overnight run: default --until 07:00, --budget $20
+npm run crew -- run <slug> --until 07:00             # stop at wall-clock time
+npm run crew -- run <slug> --rounds 10               # stop after N rounds
+npm run crew -- run <slug> --budget 15               # stop at $ cap
+npm run crew -- run <slug> --foreground              # don't detach (for debugging)
+npm run crew -- status <slug>                        # latest daily plan, session state, spend
+npm run crew -- stop <slug>                          # kill a running session cleanly
+npm run crew -- tail <slug>                          # follow the current session's log
 ```
 
-Everything is file-based. No DB, no server. A cron entry can call `npm run crew -- run <slug>` once a day if we want it fully hands-off.
+Default `run` = "launch detached, run until 07:00 or $20 spent or 30 rounds, whichever first." That's the one command you type at 11pm.
+
+Everything is file-based. No DB, no server.
 
 ## Session persistence per role
 
