@@ -8,6 +8,15 @@ Pre-sales (not MRR) is the primary goal because it's concrete, happens on a spec
 
 You (the human) provide the goal and constraints. The agents decide everything else. They round-robin through rounds — each reads the shared project state, decides for itself what to do, writes it down. At the end of each round the Strategist commits something useful to the daily plan. You act as the human-in-the-loop: click buttons, enter credentials, record TikToks, and give yes/no on anything with real-world consequences.
 
+## Day 1 vs. every day after
+
+The crew runs in one of two modes, auto-detected by whether `working.md` has content yet:
+
+- **Day 1 (kickoff).** Fresh project. The Strategist's first turn is effectively: *"Read `brief.md`. This is the goal and these are the constraints. Figure out a direction. Set up `working.md` so the rest of the crew can pick up from it."* That kickoff prompt is the human's only "direct" instruction. After it, we're off.
+- **Day N (continuation).** `working.md` already exists. Every agent's prompt becomes: *"Read `working.md`'s 'Where we are' section. Take your turn. Update it before finishing."* `brief.md` is reference only. The crew runs on its own momentum.
+
+This is what the user's job shrinks to: fill out `brief.md` once, trigger the first run, then update metrics and do the checkbox tasks. No ongoing human-in-the-loop prompting.
+
 ## Design principle: give the goal, trust the agents
 
 The whole lesson of the PDF is that Robbie didn't tell Ron what business to build — he gave Ron a budget and a deadline and got out of the way. Same rule here. Every agent, every turn, gets exactly two things:
