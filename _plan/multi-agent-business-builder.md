@@ -43,8 +43,13 @@ repo root/
 ├── projects/                       # one subfolder per business experiment (gitignored or user-owned)
 │   └── <slug>/                     # e.g. projects/fiverr-swot/
 │       ├── brief.md                # human input: goal + constraints (written once, rarely edited)
-│       ├── working.md              # THE single working doc — all agents read & edit this
-│       ├── questions.md            # async cross-role question queue (see "Escape hatch")
+│       ├── working.md              # shared working doc — all agents read & edit this
+│       ├── questions.md            # shared async cross-role question queue
+│       ├── notes/
+│       │   ├── strategist.md       # PRIVATE — strategist's running notes & confidence scores
+│       │   ├── cto.md              # PRIVATE — cto's running notes
+│       │   ├── marketer.md         # PRIVATE — marketer's running notes
+│       │   └── analyst.md          # PRIVATE — analyst's running notes
 │       ├── daily/YYYY-MM-DD.md     # round-closing snapshot for the human (phone-sized)
 │       ├── comments/YYYY-MM-DD.txt # human-pasted TikTok comments (when applicable)
 │       ├── session-log.md          # per-round stamp: rounds, wall-clock, token spend
@@ -141,24 +146,41 @@ All four are ORed. Any one trips, session exits clean, final daily plan stays on
 
 ### Confidence signal
 
-At the end of each agent's turn — before seeing the other agents' scores this round — they answer one question: *"What's your confidence (0–100%) that the current top pick gets us to $1K in pre-sales, and why in one sentence?"*
+Each agent scores the current top pick at the end of every turn, in their **own private** `notes/<role>.md` file. No agent ever sees another agent's score. Kills anchoring at the source.
 
-Stored in a `## Confidence` section at the top of `working.md`:
+Format in `notes/<role>.md` is a running diary — agent appends on every turn:
 
+```markdown
+# strategist notes
+
+## Round 1, 2026-04-17T23:12
+Top pick: "AI TikTok hook generator for Shopify stores"
+Confidence: 60%
+Reason: promising niche but no comment data yet to validate demand.
+Thinking: want to see marketer's hook drafts before I commit higher.
+
+## Round 2, 2026-04-17T23:34
+Top pick: same
+Confidence: 75%
+Reason: marketer's hook #2 is strong; still worried about niche size.
+Thinking: if analyst's next turn surfaces a comparable-sized audience, I'll push to 85+.
 ```
-## Confidence on top pick: "AI TikTok hook generator for Shopify stores"
-- strategist: 85% — comments are signaling demand, pricing validated at $29
-- cto: 90% — minimal build, Gumroad + OpenAI API, 2 days to working MVP
-- marketer: 75% — hook lands but the niche might be too narrow
-- analyst: 60% — 3 competitors already doing this, differentiation unclear
-```
 
-When all four cross 80%, we've converged and the session exits. Until then, the divergent scores are themselves valuable — they tell the next round what to attack. In the sketch above, Marketer and Analyst haven't bought in, so round N+1's work should target niche-size and competitor differentiation. The low scorers have the agenda.
+Two benefits beyond no-anchoring:
 
-Two guardrails against agreement theater (LLMs over-agreeing to end the session):
+1. **Persistent memory per role.** Each agent reads its own notes at the start of every turn — "last round I was at 60% because X; has X been addressed?" The diary becomes the agent's through-line across rounds, complementing the per-role `.session-id`.
+2. **Forensic clarity.** Every confidence shift has a reason attached and a timestamp. After a session you can trace exactly why convergence happened (or didn't).
 
-1. Each agent scores *before* the others this round are revealed — so they're not anchoring on a group consensus.
-2. A number alone doesn't count; the one-sentence reason is required. Vague reasons → Strategist flags it and the agent has to re-score with specifics.
+**The runner code**, not the agents, does convergence math. After each round it reads the latest entry in every `notes/<role>.md` and checks:
+
+1. Does each role's most recent score tag **the current top pick** from `working.md`?
+2. Is each score ≥80%?
+
+If both yes → converged, exit. If either no → run another round. Agents aren't aware of the threshold or the other scores — they just keep noting their own view.
+
+**The stale-score problem this solves.** If the Strategist scores pick "X" at 90% in turn 1 of round N, and then the CTO in turn 2 pivots the plan to "Y," the Strategist's 90% is now stale (it was for X, not Y). Because each note is tagged with the pick it scored, the runner sees Strategist's latest note is on X while the current top pick is Y — convergence fails, round N+1 runs. In round N+1, the Strategist reads its own notes ("I was 90% on X because..."), sees the current pick is Y, and re-scores against Y. The system self-corrects without any cross-agent visibility.
+
+Guardrail against agreement theater: each turn must include both a number and a one-line reason. A vague reason (e.g. "feels good") gets bounced back by the runner — same role re-runs that turn beat with "be specific."
 
 ### Cost to expect
 
@@ -191,7 +213,21 @@ Across the project, the daily files accumulate in `daily/`. Read day 1 + day 7 +
 
 One doc. Every agent reads and edits it. It's the brain of the project.
 
-There's exactly **one structural rule**: the top of `working.md` always has a short section called **"Where we are / pick up here"** that any agent can read in 30 seconds to know exactly where the project stands and what the next agent should do. Every agent that takes a turn must leave this section accurate before they finish. That's the handoff primitive — without it, round 20 doesn't know what round 19 did.
+There are **two structural rules**:
+
+1. The top of `working.md` always has a short section called **"Where we are / pick up here"** that any agent can read in 30 seconds to know exactly where the project stands and what the next agent should do. Every agent that takes a turn must leave this section accurate before they finish. That's the handoff primitive — without it, round 20 doesn't know what round 19 did.
+2. `working.md` also holds a **"Current top pick"** line — the single business idea the crew is currently evaluating. Whichever agent changes it (or replaces it with a pivot) bumps a version/timestamp. That's the handle each agent's private confidence note is scored against.
+
+### What each agent sees and writes
+
+| File | Every agent reads | Every agent writes |
+|---|---|---|
+| `brief.md` | yes | no (human-owned) |
+| `working.md` | yes | yes (shared) |
+| `questions.md` | yes | yes (shared) |
+| `notes/<their-role>.md` | yes (just theirs) | yes (private to them) |
+| `notes/<other-role>.md` | **no** | no |
+| `daily/*` | yes (reference) | only strategist, on round close |
 
 Below that section, the agents decide what lives in the doc. Likely sections that emerge naturally: the live 90-day plan, a decisions log, metrics, ideas, blockers for the human, open threads. But we don't prescribe them — if the crew decides a different structure works better, fine.
 
@@ -208,12 +244,8 @@ Link integration. Marketer already wrote the launch video script.
 Blocker: human hasn't confirmed $29 price point yet (question in
 questions.md).
 
-## Confidence on top pick
-- strategist: 85% — comments signaling demand, pricing validated
-- cto: 90% — Gumroad + API, 2-day MVP
-- marketer: 75% — hook lands but niche might be too narrow
-- analyst: 60% — 3 competitors doing this, differentiation unclear
-→ Not yet converged (need all ≥80%). Next round's work: attack niche-size and differentiation.
+## Current top pick (authoritative — used for convergence scoring)
+"AI-generated TikTok hooks for Shopify stores"
 
 ## The 90-day plan
 ...
