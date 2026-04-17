@@ -1,5 +1,7 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 
+let sessionId: string | null = null;
+
 export async function generateFunnyReply(userMessage: string): Promise<string> {
       const response = query({
             prompt: userMessage,
@@ -20,12 +22,17 @@ export async function generateFunnyReply(userMessage: string): Promise<string> {
                   ],
                   permissionMode: 'bypassPermissions',
                   allowDangerouslySkipPermissions: true,
+                  ...(sessionId ? { resume: sessionId } : {}),
             },
       });
 
+      let reply = "I've got nothing.";
       for await (const msg of response) {
-            if (msg.type === 'result' && msg.subtype === 'success') return msg.result;
+            if (msg.type === 'result') {
+                  sessionId = msg.session_id;
+                  if (msg.subtype === 'success') reply = msg.result;
+            }
       }
 
-      return "I've got nothing.";
+      return reply;
 }
