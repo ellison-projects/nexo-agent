@@ -293,41 +293,60 @@ Then CTO's turn opens `working.md`, reads "Where we are," takes its turn, update
 
 ## Day 1 outcome (what "good" looks like)
 
-After one overnight session, `daily/day-1.md` should contain a **committed business direction** — sharp enough that the human can start executing Day 2 in 30 minutes. Not "here are 10 vague ideas." A pick.
+After one overnight session, `daily/day-1.md` should contain a **ranked top 3 with a clear crew recommendation** — sharp enough that the human can approve #1 and start executing Day 2 in 30 minutes, or redirect to #2/#3 without starting over.
 
-Specifically:
+Four parts:
 
-1. **Current top pick** — a one-line business description: who the customer is, what they pay for, at what price.
-2. **Crew status** — converged (all 4 ≥80%) or not, and if not, what the core disagreement is.
-3. **Pre-sell hypothesis** — customer segment, price, hook angle, pre-sell platform. Enough to post a TikTok and open a Stan Store page.
-4. **Human action list** — 3–5 checkboxes the human can complete that day. Things only the human can do (create accounts, record a TikTok, confirm pricing).
+1. **Top 3 contenders (ranked)** — one-line business description for each: customer, price, why it could hit $1K pre-sales. Plus for #2 and #3, a line on "why not #1."
+2. **Crew status** — converged on #1 (all 4 ≥80%) or not. If not, name the core disagreement.
+3. **Pre-sell hypothesis for #1 only** — customer segment, price, hook angle, pre-sell platform. Enough to post a TikTok and open a Stan Store page.
+4. **Human action list for #1** — 3–5 checkboxes doable in 30 minutes. Things only the human can do.
+
+Why top 3 and not top 10: the crew still has to commit. Ranking 10 is diffuse; ranking 3 forces a call. The human gets the single most important decision (which business) without the crew being wishy-washy.
+
+Why pre-sell hypothesis and actions for #1 only: if the human wants #2 or #3, they edit `brief.md` with "go with #2" and trigger another run. The crew pivots from there rather than producing three parallel plans. Simpler and keeps the commitment sharp.
 
 Sketch:
 
 ```markdown
 # Day 1 of 90 — 2026-04-18
 
-## Current top pick
-"AI-generated TikTok hook scripts for Shopify store owners, $29/month"
+## Crew: CONVERGED on #1 (all 4 roles ≥80%)
 
-## Crew: CONVERGED (all 4 roles ≥80%)
+## Top 3 contenders
 
-## Pre-sell hypothesis
+### #1 — RECOMMENDED: AI-generated TikTok hook scripts for Shopify stores
+$29/mo. Customer: Shopify stores with <10K followers. 2-day MVP via Gumroad + OpenAI API.
+Why #1: tight niche, fast build, clear pre-sell hook.
+
+### #2 — AI market-research reports for indie SaaS founders
+$99 one-time. Customer: founders doing discovery. 3-day build.
+Why not #1: longer feedback loop, harder to pre-sell without a demo.
+
+### #3 — AI cold-email sequences for B2B consultants
+$49/mo. Customer: solo consultants. Easy build, crowded space.
+Why not #1: established competitors, differentiation unclear.
+
+## Pre-sell hypothesis for #1
 - Customer: Shopify store owners with <10K followers struggling with content
 - Price: $29/mo founding member, $10 refundable pre-sell deposit
 - Hook angle: "I made an AI write 30 days of viral hooks for your store"
 - Platform: Stan Store for pre-sell, TikTok for traffic
 
-## What you need to do today
+## What to do today (if you approve #1)
 - [ ] Create TikTok account (@<handle proposed by marketer>)
 - [ ] Sign up for Stan Store, create pre-sell product
 - [ ] Record + post the first TikTok (script in working.md)
 - [ ] Answer the 2 questions in working.md's "Open for human" section
+
+## Want #2 or #3 instead?
+Add `decision: go with #2` (or #3) to brief.md and trigger another run.
+Or drop your own direction in brief.md — the crew will pivot from there.
 ```
 
-**Sad path** — if the crew didn't converge by morning (ran out of budget / rounds / time), the daily file still has a best-effort top pick, but says "NOT CONVERGED" up top with the single unresolved concern. Human can either act on it anyway or trigger another overnight session after addressing the concern.
+**Sad path** — if the crew didn't converge on #1 (ran out of budget / rounds / time), the daily still shows top 3 ranked, says "NOT CONVERGED" up top, and surfaces the single unresolved concern. Human can approve the best-effort #1 anyway, or address the concern in `brief.md` and re-run.
 
-Day N's outcome shifts as the project progresses (Day 5 might be "the pre-sell page is drafted, here's the final script for TikTok 2"), but the structure stays the same: committed state + concrete human actions.
+Day N's outcome shifts as the project progresses — Day 5 might be "pre-sell page is drafted, here's the final TikTok 2 script" — but the structure stays the same: crew commits to a recommendation, human approves or redirects.
 
 ## Tracking progress
 
