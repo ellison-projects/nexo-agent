@@ -38,6 +38,8 @@ Base URL: `https://app.nexoprm.com`
    - Never guess a person id.
 4. Prefer `PATCH` over recreate; most updates are idempotent.
 5. **When unsure, ask first.** If a name is ambiguous, the content of a moment/item is unclear, or the right endpoint isn't obvious, confirm with the user before writing.
+6. **Always report back what you updated.** After every successful write, tell the user in one line what changed and on which record — include the person/list/note name and the id. Example: *"Logged moment #812 on Sarah Chen (#42)."* / *"Added 'milk' (#3041) to groceries list #17."* If the write failed, say what went wrong and what you did (or didn't do).
+7. **When disambiguating people, show ids.** List each candidate with its id so the user can pick unambiguously. Example: *"I have two Sams — #42 Sam Rivera (sam@example.com), #88 Sam Okafor (+1 555-0134). Which one?"*
 
 ## Error shape
 
@@ -163,11 +165,13 @@ These three flows cover the main use cases. Each shows the user prompt, the curl
 
 ### Flow A — Add a moment for a contact
 
-**User:** "Log that Sarah mentioned her dad is in the hospital."
+Short-form phrasings like *"Sam likes pineapple pizza"* or *"Jamie's kid started kindergarten today"* are moments. Treat the first word/name as the person to look up and the rest as the moment content.
+
+**User:** "Sam likes pineapple pizza."
 
 **Step 1. Search for the person.**
 ```bash
-curl -s "https://app.nexoprm.com/api/agent/people?q=sarah" \
+curl -s "https://app.nexoprm.com/api/agent/people?q=sam" \
   -H "Authorization: Bearer $NEXO_API_KEY" \
   -H "X-Nexo-User: $NEXO_USER"
 ```
@@ -176,16 +180,16 @@ Expected response:
 ```json
 {
   "people": [
-    { "id": "42", "name": "Sarah Chen", "email": "sarah@example.com", "phone": null }
+    { "id": "42", "name": "Sam Rivera", "email": "sam@example.com", "phone": null }
   ]
 }
 ```
 
 **Branch on match count:**
 
-- **1 match** → use `people[0].id` and proceed to step 2.
-- **0 matches** → ask the user before creating:
-  > "I don't have a Sarah yet. Create a new contact 'Sarah' and log the moment, or did you mean someone else?"
+- **1 match** → use `people[0].id` and proceed to step 2. No need to ask.
+- **0 matches** → ask before creating:
+  > "I don't have a Sam yet. Want me to create a new contact 'Sam' and log the moment, or did you mean someone else?"
 
   If confirmed, create first:
   ```bash
@@ -193,21 +197,23 @@ Expected response:
     -H "Authorization: Bearer $NEXO_API_KEY" \
     -H "X-Nexo-User: $NEXO_USER" \
     -H "Content-Type: application/json" \
-    -d '{"name":"Sarah"}'
+    -d '{"name":"Sam"}'
   ```
-  Response: `{ "person": { "id": "57", "name": "Sarah", ... } }` (201). Use that id.
+  Response: `{ "person": { "id": "57", "name": "Sam", ... } }` (201). Use that id.
 
-- **2+ matches** → list candidates and wait. Never guess.
+- **2+ matches** → list candidates **with ids** and wait. Never guess.
   ```json
   {
     "people": [
-      { "id": "42", "name": "Sarah Chen",    "email": "sarah@example.com", "phone": null },
-      { "id": "88", "name": "Sarah Okafor",  "email": null,                "phone": "+1 555-0134" }
+      { "id": "42", "name": "Sam Rivera", "email": "sam@example.com", "phone": null },
+      { "id": "88", "name": "Sam Okafor", "email": null,              "phone": "+1 555-0134" }
     ]
   }
   ```
   Ask:
-  > "I have two Sarahs — Sarah Chen (sarah@example.com) and Sarah Okafor (555-0134). Which one?"
+  > "I have two Sams — which one?
+  > - **#42** Sam Rivera (sam@example.com)
+  > - **#88** Sam Okafor (+1 555-0134)"
 
 **Step 2. Log the moment.**
 ```bash
@@ -215,7 +221,7 @@ curl -s -X POST "https://app.nexoprm.com/api/agent/moments" \
   -H "Authorization: Bearer $NEXO_API_KEY" \
   -H "X-Nexo-User: $NEXO_USER" \
   -H "Content-Type: application/json" \
-  -d '{"person_id":"42","content":"Sarah mentioned her dad is in the hospital."}'
+  -d '{"person_id":"42","content":"Sam likes pineapple pizza."}'
 ```
 
 Expected response (201):
@@ -224,15 +230,15 @@ Expected response (201):
   "moment": {
     "id": "812",
     "person_id": "42",
-    "content": "Sarah mentioned her dad is in the hospital.",
+    "content": "Sam likes pineapple pizza.",
     "created_at": "2026-04-17T14:30:00Z"
   },
   "ai_analysis_queued": true
 }
 ```
 
-Confirm to the user:
-> "Logged a moment on Sarah Chen. AI reminders will come through shortly if anything's flagged."
+**Step 3. Report back.** Always tell the user what was written, with ids:
+> "Logged moment #812 on Sam Rivera (#42): 'Sam likes pineapple pizza.' AI analysis queued."
 
 ---
 
@@ -263,8 +269,8 @@ Expected response (201):
 }
 ```
 
-Confirm:
-> "Added milk to your groceries list."
+Report back with ids:
+> "Added 'milk' (#3041) to groceries list #17."
 
 **Branch: no active list yet (404).** Response:
 ```json
@@ -316,8 +322,8 @@ Expected response (201):
 }
 ```
 
-Confirm:
-> "Added 'Call the plumber' to your current plan."
+Report back with ids:
+> "Added 'Call the plumber' (#904) to your current plan (note #61)."
 
 **Branch: no note yet (404).** Response:
 ```json
