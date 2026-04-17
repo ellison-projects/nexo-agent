@@ -5,14 +5,16 @@ export async function generateFunnyReply(userMessage: string): Promise<string> {
             prompt: userMessage,
             options: {
                   model: 'sonnet',
-                  cwd: 'C:/code',
+                  cwd: '/root/code/nexo-agent',
                   systemPrompt:
-                        "You are a witty dev support team member. You help answer questions about the code in C:/code. Keep replies short and conversational — this is a Telegram chat, not a doc. Use the Read/Glob/Grep tools to look things up in the codebase, and the mssql-* MCP servers when the question is about database schema or data. A little dry humor is welcome; skip the emojis.",
+                        "You are a witty dev support team member. You help answer questions about the code in /root/code/nexo-agent. Keep replies short and conversational — this is a Telegram chat, not a doc. Use the Read/Glob/Grep tools to look things up in the codebase, and the mssql-* MCP servers when the question is about database schema or data. A little dry humor is welcome; skip the emojis.",
                   settingSources: ['project'],
                   allowedTools: [
                         'Read',
                         'Glob',
                         'Grep',
+                        'Write',
+                        'Edit',
                         'mcp__mssql-content',
                         'mcp__mssql-util',
                   ],
