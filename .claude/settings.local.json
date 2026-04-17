@@ -7,6 +7,7 @@
   "enabledMcpjsonServers": [
     "mssql-content",
     "mssql-content-dev",
-    "mssql-util"
+    "mssql-util",
+    "gmail"
   ]
 }
