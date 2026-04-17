@@ -291,6 +291,44 @@ You just filled out `brief.md` and typed `npm run crew -- run my-biz`. The Strat
 
 Then CTO's turn opens `working.md`, reads "Where we are," takes its turn, updates "Where we are" before finishing. Same for Marketer. Same for Analyst. Then Strategist's round-closing turn writes `daily/<today>.md` — a phone-sized snapshot for you — and updates "Where we are" one more time. Round 2 starts from that state.
 
+## Day 1 outcome (what "good" looks like)
+
+After one overnight session, `daily/day-1.md` should contain a **committed business direction** — sharp enough that the human can start executing Day 2 in 30 minutes. Not "here are 10 vague ideas." A pick.
+
+Specifically:
+
+1. **Current top pick** — a one-line business description: who the customer is, what they pay for, at what price.
+2. **Crew status** — converged (all 4 ≥80%) or not, and if not, what the core disagreement is.
+3. **Pre-sell hypothesis** — customer segment, price, hook angle, pre-sell platform. Enough to post a TikTok and open a Stan Store page.
+4. **Human action list** — 3–5 checkboxes the human can complete that day. Things only the human can do (create accounts, record a TikTok, confirm pricing).
+
+Sketch:
+
+```markdown
+# Day 1 of 90 — 2026-04-18
+
+## Current top pick
+"AI-generated TikTok hook scripts for Shopify store owners, $29/month"
+
+## Crew: CONVERGED (all 4 roles ≥80%)
+
+## Pre-sell hypothesis
+- Customer: Shopify store owners with <10K followers struggling with content
+- Price: $29/mo founding member, $10 refundable pre-sell deposit
+- Hook angle: "I made an AI write 30 days of viral hooks for your store"
+- Platform: Stan Store for pre-sell, TikTok for traffic
+
+## What you need to do today
+- [ ] Create TikTok account (@<handle proposed by marketer>)
+- [ ] Sign up for Stan Store, create pre-sell product
+- [ ] Record + post the first TikTok (script in working.md)
+- [ ] Answer the 2 questions in working.md's "Open for human" section
+```
+
+**Sad path** — if the crew didn't converge by morning (ran out of budget / rounds / time), the daily file still has a best-effort top pick, but says "NOT CONVERGED" up top with the single unresolved concern. Human can either act on it anyway or trigger another overnight session after addressing the concern.
+
+Day N's outcome shifts as the project progresses (Day 5 might be "the pre-sell page is drafted, here's the final script for TikTok 2"), but the structure stays the same: committed state + concrete human actions.
+
 ## Tracking progress
 
 Three signals, in order of importance:
