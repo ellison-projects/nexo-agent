@@ -22,7 +22,8 @@ repo root/
 │       │   ├── daily/YYYY-MM-DD.md # one file per round — the day's plan
 │       │   ├── decisions.md        # append-only log of decisions + who proposed them
 │       │   ├── metrics.md          # MRR, pre-orders, followers, churn — human-updated
-│       │   └── backlog.md          # open tasks, blockers, questions for the human
+│       │   ├── backlog.md          # open tasks, blockers, questions for the human
+│       │   └── questions.md        # agent-to-agent questions queue (see "Escape hatch")
 │       └── transcripts/            # raw per-turn agent output, one file per turn
 ├── src/crew/
 │   ├── run.ts                      # CLI entrypoint: `npm run crew -- --project <slug>`
@@ -59,9 +60,13 @@ A **round** is one pass through all four roles plus a synthesis step. A **sessio
 ```
 for each role in [strategist, cto, marketer, analyst]:
   1. load brief.md + state/*.md + last N transcripts (including THIS round's prior turns)
-  2. prompt the role, with two required beats:
-     a) CHALLENGE: "What did the prior agents get wrong or miss? Push back specifically."
-     b) CONTRIBUTE: "Now what do you add or change from your own angle?"
+  2. prompt the role, with three required beats:
+     a) ANSWER: "Are there any questions addressed to you in questions.md?
+        Answer them first. Mark each one resolved."
+     b) CHALLENGE: "What did the prior agents get wrong or miss? Push back specifically."
+     c) CONTRIBUTE: "Now what do you add or change from your own angle?
+        If you have a question for another role that would unblock you,
+        append it to questions.md targeted at that role."
   3. let the agent use Edit/Write on files under state/ (scoped via cwd)
   4. append its reasoning + file diff summary to transcripts/<timestamp>-<role>.md
 
@@ -71,6 +76,24 @@ then (synthesis step):
 ```
 
 The CHALLENGE beat is non-optional — it's why we pay for multiple rounds. Each agent must name at least one thing from the current state they disagree with before adding their own contribution. If they have nothing to push back on, the session is near convergence and should stop soon anyway.
+
+### Escape hatch: `questions.md`
+
+We picked round-robin over parallel-with-messaging because it's deterministic and cheap (no file-edit races, no deadlocks, no runaway chatter). The one weakness round-robin has is that an agent who needs a clarifying input from another role has to wait for the next round. `questions.md` fixes that without the complexity of a real message bus.
+
+Format is just append-only bullets:
+
+```markdown
+## Pending
+- [ ] 2026-04-17T23:42 marketer → cto: Is a Chrome extension feasible within $200 infra budget?
+- [ ] 2026-04-17T23:58 analyst → strategist: Are we committed to SaaS, or open to services?
+
+## Resolved
+- [x] 2026-04-17T23:15 strategist → cto: What's our pre-sell page stack?
+      cto @ 2026-04-17T23:40: Stripe Payment Link + a static HTML one-pager. Zero code beyond copy.
+```
+
+The ANSWER beat at the top of each turn enforces that questions get cleared before they pile up. If you see `questions.md` growing round-over-round without shrinking, that's a signal the crew is blocked on each other and we should reconsider the architecture.
 
 Each round overwrites the day's plan in place. If the session crashes at round 17, you still have round 16's plan waiting for you in the morning — it's not worse than no plan, it's just not fully cooked.
 
@@ -224,6 +247,7 @@ Matching the PDF's "human in the loop" framing:
 - **Run shape**: 11pm trigger → detached process → many rounds back-to-back overnight. Each round: all 4 agents take a turn, each challenging prior turns before contributing. Stops at `--until 07:00` / `--budget $20` / `--rounds 30` / convergence, whichever first.
 - **`projects/` location**: inside the repo, gitignored.
 - **Comment ingestion (v1)**: manual — you paste TikTok comments into `projects/<slug>/state/comments/YYYY-MM-DD.txt` before triggering the run. Apify integration is a v2 concern.
+- **Round-robin, not parallel**: all 4 agents run sequentially, one turn at a time, with a `questions.md` escape hatch for cross-role clarifying questions. Parallel-with-async-messaging was considered and rejected for v1 — it buys you coordination complexity (file races, deadlocks, runaway chatter, non-deterministic replay) against a benefit the CHALLENGE beat already provides. Revisit only if `questions.md` piles up unresolved round-over-round.
 
 ### Still open
 
