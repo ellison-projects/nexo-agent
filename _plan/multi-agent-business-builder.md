@@ -4,7 +4,22 @@
 
 Turn this repo into a launcher for a small "virtual team" of Claude Agent SDK agents that work together on a single business idea with one objective: **hit $1,000 MRR within 90 days**, using the Robbie/Ron playbook from `docs/How to Get an AI Agent to Make Money for You.pdf` as the operating manual.
 
-You (the human) pick the idea (or have the team pick one). The agents round-robin through daily cycles — each reads the shared project state, contributes from its role, and at the end of each round a daily plan is emitted. You act as the human-in-the-loop: click buttons, enter credentials, record TikToks, and give yes/no on anything with real-world consequences.
+You (the human) provide the goal and constraints. The agents decide everything else. They round-robin through rounds — each reads the shared project state, decides for itself what to do, writes it down. At the end of each round the Strategist commits something useful to the daily plan. You act as the human-in-the-loop: click buttons, enter credentials, record TikToks, and give yes/no on anything with real-world consequences.
+
+## Design principle: give the goal, trust the agents
+
+The whole lesson of the PDF is that Robbie didn't tell Ron what business to build — he gave Ron a budget and a deadline and got out of the way. Same rule here. Every agent, every turn, gets exactly two things:
+
+1. **The high-level goal** — from `brief.md`. $1K MRR in 90 days, the human's constraints, skills, budget.
+2. **Where we are right now** — the state files (`plan.md`, `daily/*`, `decisions.md`, `metrics.md`, `backlog.md`, `questions.md`, any pasted `comments/*`).
+
+Plus a one-liner identifying which role they are ("you are the CTO"). That's it. No turn checklists, no mandated output shapes, no scoring rubrics, no "round 1 does X, round 2 does Y" scripts.
+
+If a section of this plan tells an agent *what* to produce on turn N rather than providing the goal + state, that section is wrong and should be cut. The only infrastructure constraints are:
+- The Strategist's last turn of each round writes something to `daily/YYYY-MM-DD.md` so the human has something to wake up to.
+- If `questions.md` has a pending item addressed to you, deal with it on your turn.
+
+Everything else — what to work on, what artifact shape fits today, whether to challenge prior work, when to pivot — the agent decides.
 
 ## What already exists vs. what's new
 
@@ -23,7 +38,9 @@ repo root/
 │       │   ├── decisions.md        # append-only log of decisions + who proposed them
 │       │   ├── metrics.md          # MRR, pre-orders, followers, churn — human-updated
 │       │   ├── backlog.md          # open tasks, blockers, questions for the human
-│       │   └── questions.md        # agent-to-agent questions queue (see "Escape hatch")
+│       │   ├── questions.md        # agent-to-agent questions queue (see "Escape hatch")
+│       │   ├── session-log.md      # per-round stamp: rounds, wall-clock, token spend
+│       │   └── comments/YYYY-MM-DD.txt  # (later) pasted TikTok comments for the Analyst
 │       └── transcripts/            # raw per-turn agent output, one file per turn
 ├── src/crew/
 │   ├── run.ts                      # CLI entrypoint: `npm run crew -- --project <slug>`
@@ -42,16 +59,16 @@ The `roles/*/ROLE.md` files are the "personality + job description" for each age
 
 ## The four roles
 
-Mapped directly to what the PDF says the work is:
+Each role is an **identity** (a lens), not a job description:
 
-| Role | Owns | Typical turn output |
-|---|---|---|
-| **Strategist** (CEO) | `plan.md`, picking the business, 90-day targets, pivots | Updates plan; reconciles conflicts between other roles; picks what ships next |
-| **CTO** | Technical strategy + code. Feasibility calls, build-vs-buy, where code gives leverage, tech-stack picks, and actually writing the code when it's code-time | Pushes back on Strategist when an idea is infeasible or when code could 10x it; tech roadmap; commits to `build/`; picks libraries/platforms |
-| **Marketer** (Content) | TikTok/Reels/Shorts scripts, hooks, posting cadence | Video briefs; 5-video content calendar; cross-post plan |
-| **Analyst** (Research) | Comment mining, competitor scans, audience demand signals | "Top 3 demand signals from today's comments"; pricing benchmarks; pivot recommendations |
+| Role | The lens |
+|---|---|
+| **Strategist** (CEO) | Is this the right business? Are we closer to $1K MRR than yesterday? What should we stop doing? |
+| **CTO** | What would engineering leverage change about this business? What's feasible vs. fantasy? Build, buy, or skip? |
+| **Marketer** | Would a human stop scrolling for this? Where's the audience, what's the hook, what's the story? |
+| **Analyst** | What does the evidence say? Who else is doing this, at what price, with what result? What's the market actually telling us? |
 
-The CTO is a peer to the Strategist, not a downstream executor. The Strategist says "what business"; the CTO says "here's the engineering leverage that changes the shape of that business" — e.g., "a scraper would turn this from a service into a product," or "don't build this, Gumroad already does it." No-code platform signups (Stripe dashboard, Discord, Skool) still stay with the human per the PDF; the CTO picks the platform, the human signs up.
+That's the whole role definition. `roles/<role>/ROLE.md` holds the same thing in system-prompt form — short, identity-focused, no turn-by-turn instructions. The Strategist closes the round (by convention so the human has a single synthesizer), but they're all peers.
 
 ## Round-robin loop
 
@@ -60,22 +77,15 @@ A **round** is one pass through all four roles plus a synthesis step. A **sessio
 ```
 for each role in [strategist, cto, marketer, analyst]:
   1. load brief.md + state/*.md + last N transcripts (including THIS round's prior turns)
-  2. prompt the role, with three required beats:
-     a) ANSWER: "Are there any questions addressed to you in questions.md?
-        Answer them first. Mark each one resolved."
-     b) CHALLENGE: "What did the prior agents get wrong or miss? Push back specifically."
-     c) CONTRIBUTE: "Now what do you add or change from your own angle?
-        If you have a question for another role that would unblock you,
-        append it to questions.md targeted at that role."
+  2. prompt the role with only: "You are <role>. Here's the goal. Here's the state.
+     Take your turn." Agent decides what to do.
   3. let the agent use Edit/Write on files under state/ (scoped via cwd)
   4. append its reasoning + file diff summary to transcripts/<timestamp>-<role>.md
 
-then (synthesis step):
-  5. Strategist agent runs a "close the round" turn that reads the other three turns
-     and rewrites state/daily/YYYY-MM-DD.md — the current best Top-10
+last turn of each round is the Strategist's, and by convention that turn writes
+state/daily/YYYY-MM-DD.md — whatever the Strategist judges most useful for the
+human to see in the morning.
 ```
-
-The CHALLENGE beat is non-optional — it's why we pay for multiple rounds. Each agent must name at least one thing from the current state they disagree with before adding their own contribution. If they have nothing to push back on, the session is near convergence and should stop soon anyway.
 
 ### Escape hatch: `questions.md`
 
@@ -122,17 +132,6 @@ Whichever triggers first:
 
 All four are ORed. Any one trips, session exits clean, final daily plan stays on disk.
 
-### Why rounds need to evolve (the big design rule)
-
-If every round is just "re-propose the top 10," round 20 looks identical to round 2 and you've burned $15 for nothing. Each round must do *different work* than the last. The role prompts enforce this:
-
-- **Strategist**: round 1 proposes; rounds 2+ *stress-test* the current top 3 ("what would have to be true for #1 to fail by day 30?")
-- **CTO**: round 1 gives feasibility scores; rounds 2+ sketch implementation for the top 3 and let that refine the ranking
-- **Marketer**: round 1 drafts hooks; rounds 2+ writes the actual 30-second TikTok scripts for the top 3 and reads which script "wants" to be made — that feeds ranking
-- **Analyst**: round 1 surveys competitors; rounds 2+ goes deep on the top 3 — pricing, existing solutions, demand evidence
-
-By round ~10, the top 3 have been attacked from four angles. That's the whole point of running overnight vs. running once.
-
 ### Cost to expect
 
 Rough back-of-napkin: 4 roles × ~30s Opus turn × 20 rounds ≈ $5–$15/session depending on context growth. The `--budget $X` cap is the hard guardrail. Worth logging cumulative spend in `state/session-log.md` after every round so you can see where it went.
@@ -151,52 +150,54 @@ Next step for you: see the 2 checkboxes at bottom of the daily plan.
 
 One command, one paragraph, one file to open. That's the morning interface.
 
-## The daily plan contract
+## The daily plan
 
-Each role takes its turn, then the Strategist closes the round by writing `state/daily/YYYY-MM-DD.md`. The core artifact is a **ranked Top-10** — the crew's best options for today, with rationale. You pick 1–3 to execute.
+Each round's last turn (Strategist) writes `state/daily/YYYY-MM-DD.md`. The Strategist decides what goes in it. Some days that's a ranked Top-10 of ideas. Some days it's a single decision the human needs to make. Some days it's "we're blocked, here's the question." Whatever is most useful.
 
-What the Top-10 *is* changes with the project phase:
+The only hard constraint is **fit on one phone screen**. If the Strategist can't say it in one screen, the Strategist hasn't figured out what today's answer is yet.
 
-| Phase | What the Top-10 ranks |
+Across the project, the daily files accumulate in `daily/`. Read day 1 + day 7 + day 30 in a row and you see the trajectory.
+
+## Cold start: what happens the first time you run this
+
+You just filled out `brief.md` and typed `npm run crew -- run my-biz`. The Strategist is about to take turn 1 of round 1. Here's exactly what it sees and what it does.
+
+**What the Strategist knows going in:**
+
+1. **The goal** — the full contents of `brief.md`. At minimum: "$1K MRR in 90 days, budget $X, here's my skills, here's what I'm willing and not willing to do."
+2. **The state** — which on turn 1 is nearly empty. `plan.md` doesn't exist. `daily/` is empty. `metrics.md` shows zeros. `decisions.md` is empty. `questions.md` is empty. `comments/` is empty.
+3. **Its identity** — one-line system prompt: "You are the Strategist. Your lens: is this the right business? Are we closer to $1K MRR than yesterday? What should we stop doing?"
+4. **The playbook** — `docs/How to Get an AI Agent to Make Money for You.pdf` is accessible in the session context as reference material. Every agent can read it.
+5. **Round context** — "You are turn 1 of round 1. This is a fresh project."
+
+**What it likely produces** (not mandated — this is the prediction, not the contract):
+
+- Creates `plan.md` with a first-pass 90-day plan
+- Logs an entry in `decisions.md` about the initial direction
+- Maybe appends clarifying questions to `questions.md` for the CTO/Marketer/Analyst
+- Maybe adds questions for the human to `backlog.md`
+
+**What it definitely produces** (infrastructure):
+
+- A transcript at `transcripts/<timestamp>-strategist.md` with its reasoning and file-diff summary
+- Updated `state/session-log.md` with rounds/tokens spent
+
+Then turn 2 fires: the CTO opens, reads everything the Strategist just wrote, takes its turn. Then Marketer. Then Analyst. Then the Strategist closes the round by writing `daily/<today>.md`. That's round 1. Then round 2 starts from the new state.
+
+## Tracking progress
+
+Progress lives in the state files — no separate dashboard. Four sources, each answering a different question:
+
+| File | Answers |
 |---|---|
-| Week 1 — Discovery | Business ideas the crew thinks can hit $1K MRR in 90 days |
-| Week 2 — Validation | TikTok hooks to test / demand-signal experiments |
-| Week 3 — Pre-sell | Product features, pricing tiers, pre-sell page angles |
-| Week 4+ — Build/fulfill | Shipped features, growth experiments, pivot candidates, content angles |
+| `daily/YYYY-MM-DD.md` | "What's the crew's best thinking today?" — one per round-closing (last overwrite wins each day) |
+| `metrics.md` | "Are the numbers moving?" — MRR, pre-orders, followers, churn. Human updates after real-world events. |
+| `decisions.md` | "What did we commit to, when, and why?" — append-only log |
+| `plan.md` | "How has the 90-day plan evolved?" — `git log` this file for the trajectory |
 
-Fixed shape so it's scannable on a phone:
+Plus `transcripts/` for forensic detail if you want to know why a decision happened.
 
-```markdown
-# Day <N> of 90 — YYYY-MM-DD
-
-## Current MRR: $X   Pre-orders: N   Followers: N
-
-## Top 10 Plays (ranked)
-1. **<title>** — score: X/10 — proposed by: <role>
-   why it's #1: <one line>
-   what it costs you: <time/money/risk>
-2. **<title>** — score: X/10 — proposed by: <role>
-   ...
-(through 10)
-
-## The crew's pick for today
-The Strategist recommends #<N>. Here's why over #<M>: <one line>.
-
-## What YOU need to do to run the pick
-- [ ] <task>
-- [ ] <task>
-
-## Open questions for you
-1. ...
-```
-
-Ranking rules for the Strategist's synthesis:
-- Score 1–10 on a single axis: *"probability this gets us closer to $1K MRR in the next 7 days."*
-- Each role must propose at least 2 ideas; Strategist can add its own and must rank all of them.
-- No ties. Force a call.
-- Ideas carry forward — if idea #4 from yesterday still makes sense, it can rerank today; if it got stale, it drops off. `plan.md` tracks which ideas have been tried, shipped, or killed.
-
-If the daily plan grows past one phone screen above the Top-10 list, we've lost the plot. Enforce that in the synthesis prompt.
+The real progress signal is **"is something real happening in the world?"** Not "did the plan get more words." If after a week `metrics.md` is still all zeros and nothing got posted/shipped/sold, the crew is spinning and you rewrite the brief or the role identities.
 
 ## CLI
 
