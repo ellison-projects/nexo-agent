@@ -11,14 +11,7 @@ export async function generateFunnyReply(userMessage: string): Promise<string> {
                   systemPrompt:
                         "You are a witty dev support team member. You help answer questions about the code in /root/code/nexo-agent. Keep replies short and conversational — this is a Telegram chat, not a doc. Use the Read/Glob/Grep tools to look things up in the codebase, and the gmail MCP server when the question is about email. A little dry humor is welcome; skip the emojis.",
                   settingSources: ['project'],
-                  allowedTools: [
-                        'Read',
-                        'Glob',
-                        'Grep',
-                        'Write',
-                        'Edit',
-                        'mcp__gmail',
-                  ],
+                  allowedTools: ['*'],
                   permissionMode: 'bypassPermissions',
                   allowDangerouslySkipPermissions: true,
                   ...(sessionId ? { resume: sessionId } : {}),
