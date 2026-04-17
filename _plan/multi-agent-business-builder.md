@@ -34,37 +34,58 @@ Everything else — what to work on, what artifact shape fits today, whether to 
 
 ## What already exists vs. what's new
 
-The existing bot (`src/index.ts`, `src/ai.ts`, `src/telegram.ts`) is a single-agent Telegram responder. It stays untouched. This feature is a **separate entry point** — new files under `src/crew/` and a new `npm run crew` script. They share one thing: the same `@anthropic-ai/claude-agent-sdk` dependency and the same `settingSources: ['project', 'user', 'local']` pattern, so roles can drop their own `.claude/` config if we want later.
+The existing bot (`src/index.ts`, `src/ai.ts`, `src/telegram.ts`) is a single-agent Telegram responder. **It must not be affected by this feature at all.** That means:
+
+- No edits to the root `package.json`, `tsconfig.json`, or `ecosystem.config.cjs`.
+- No edits to anything under `src/`.
+- No touching `.session-id` (the bot's session state).
+- No shared `node_modules/` — the crew installs its own.
+- No root `npm run crew` passthrough — the crew is invoked from inside `crew/`.
+- No reading or writing outside `crew/`. Every agent's `cwd`, `.session-id`, `.claude/` config, `.env`, and project state lives inside the sub-package. An agent can't see the bot's code, the bot's session, or the repo-root `.claude/`.
+
+This feature lives entirely in a **separate sub-package** at `crew/` with its own `package.json`, `tsconfig.json`, and `node_modules/`. You can delete the entire `crew/` folder at any time and the bot keeps working exactly as it does today.
+
+Shared between bot and crew: only the repo itself (so both are version-controlled together) and the `docs/` folder (crew reads the PDF at `../docs/...`). Nothing else.
 
 ## Shape of the system
 
 ```
 repo root/
-├── projects/                       # one subfolder per business experiment (gitignored or user-owned)
-│   └── <slug>/                     # e.g. projects/fiverr-swot/
-│       ├── brief.md                # human input: goal + constraints (written once, rarely edited)
-│       ├── working.md              # shared working doc — all agents read & edit this
-│       ├── questions.md            # shared async cross-role question queue
-│       ├── notes/
-│       │   ├── strategist.md       # PRIVATE — strategist's running notes & confidence scores
-│       │   ├── cto.md              # PRIVATE — cto's running notes
-│       │   ├── marketer.md         # PRIVATE — marketer's running notes
-│       │   └── analyst.md          # PRIVATE — analyst's running notes
-│       ├── daily/YYYY-MM-DD.md     # round-closing snapshot for the human (phone-sized)
-│       ├── comments/YYYY-MM-DD.txt # human-pasted TikTok comments (when applicable)
-│       ├── session-log.md          # per-round stamp: rounds, wall-clock, token spend
-│       └── transcripts/            # raw per-turn agent output (forensic, not working state)
-├── src/crew/
-│   ├── run.ts                      # CLI entrypoint: `npm run crew -- --project <slug>`
-│   ├── roles.ts                    # role registry (name, system prompt, output contract)
-│   ├── turn.ts                     # runs a single agent turn against the project state
-│   ├── round.ts                    # round-robin loop + synthesis into daily plan
-│   └── state.ts                    # read/write helpers for the project state files
-└── roles/
-    ├── strategist/ROLE.md          # CEO — owns the plan, picks direction, reads market signals
-    ├── cto/ROLE.md                 # CTO — tech strategy, feasibility, code; peer to Strategist
-    ├── marketer/ROLE.md            # Content — TikTok scripts, hooks, posting schedule
-    └── analyst/ROLE.md             # Research — comment mining, competitor scans, demand signals
+├── package.json                    # existing bot — unchanged
+├── src/                            # existing bot — unchanged
+├── ecosystem.config.cjs            # existing bot's pm2 config — unchanged
+├── docs/
+│   └── How to Get an AI Agent...pdf  # referenced by crew via ../docs/
+├── _plan/
+└── crew/                           # the sub-package — self-contained
+    ├── package.json                # crew's own deps + npm scripts
+    ├── tsconfig.json
+    ├── ecosystem.config.cjs        # crew's own pm2 config (for detached runs)
+    ├── src/
+    │   ├── run.ts                  # CLI entrypoint
+    │   ├── roles.ts                # role registry
+    │   ├── turn.ts                 # runs a single agent turn
+    │   ├── round.ts                # round-robin loop + synthesis
+    │   └── state.ts                # read/write helpers for project state
+    ├── roles/
+    │   ├── strategist/ROLE.md      # CEO — picks direction, reads market signals
+    │   ├── cto/ROLE.md             # CTO — tech strategy, feasibility, code
+    │   ├── marketer/ROLE.md        # Content — TikTok scripts, hooks, posting
+    │   └── analyst/ROLE.md         # Research — comments, competitors, demand
+    └── projects/                   # one folder per business experiment (gitignored)
+        └── <slug>/                 # e.g. crew/projects/fiverr-swot/
+            ├── brief.md                # human input: goal + constraints (written once, rarely edited)
+            ├── working.md              # shared working doc — all agents read & edit this
+            ├── questions.md            # shared async cross-role question queue
+            ├── notes/
+            │   ├── strategist.md       # PRIVATE — strategist's running notes & confidence scores
+            │   ├── cto.md              # PRIVATE — cto's running notes
+            │   ├── marketer.md         # PRIVATE — marketer's running notes
+            │   └── analyst.md          # PRIVATE — analyst's running notes
+            ├── daily/YYYY-MM-DD.md     # round-closing snapshot for the human (phone-sized)
+            ├── comments/YYYY-MM-DD.txt # human-pasted TikTok comments (when applicable)
+            ├── session-log.md          # per-round stamp: rounds, wall-clock, token spend
+            └── transcripts/            # raw per-turn agent output (forensic, not working state)
 ```
 
 The `roles/*/ROLE.md` files are the "personality + job description" for each agent. They get concatenated into that role's system prompt at turn time. Keeping them as Markdown (not inline strings) means you can iterate on them without touching TypeScript.
@@ -403,17 +424,23 @@ Transcripts are forensic — only open them when something went wrong and you ne
 
 ## CLI
 
+All commands run from inside the `crew/` sub-package — `cd crew` first. The root repo's scripts (`npm run dev`, `npm run restart`, etc.) are untouched.
+
 ```
-npm run crew -- init <slug>                          # scaffold projects/<slug>/
-npm run crew -- run <slug>                           # detached run: default --duration 30m, --rounds 15, --budget $5
-npm run crew -- run <slug> --duration 60m            # longer duration (if you want more rounds)
-npm run crew -- run <slug> --until 07:00             # wall-clock deadline instead of duration
-npm run crew -- run <slug> --rounds 10               # stop after N rounds
-npm run crew -- run <slug> --budget 10               # stop at $ cap
-npm run crew -- run <slug> --foreground              # don't detach (for debugging)
-npm run crew -- status <slug>                        # latest daily plan, session state, spend
-npm run crew -- stop <slug>                          # kill a running session cleanly
-npm run crew -- tail <slug>                          # follow the current session's log
+cd crew
+
+npm install                                  # one-time, crew's own deps
+
+npm run crew -- init <slug>                  # scaffold projects/<slug>/
+npm run crew -- run <slug>                   # detached run: default --duration 30m, --rounds 15, --budget $5
+npm run crew -- run <slug> --duration 60m    # longer duration (if you want more rounds)
+npm run crew -- run <slug> --until 07:00     # wall-clock deadline instead of duration
+npm run crew -- run <slug> --rounds 10       # stop after N rounds
+npm run crew -- run <slug> --budget 10       # stop at $ cap
+npm run crew -- run <slug> --foreground      # don't detach (for debugging)
+npm run crew -- status <slug>                # latest daily plan, session state, spend
+npm run crew -- stop <slug>                  # kill a running session cleanly
+npm run crew -- tail <slug>                  # follow the current session's log
 ```
 
 Default `run` = "launch detached, run for 30m or $5 spent or 15 rounds, whichever first." That's the one command you type at 11pm.
@@ -422,15 +449,18 @@ Everything is file-based. No DB, no server.
 
 ## Session persistence per role
 
-Each role gets its **own** `.session-id` file (e.g. `projects/<slug>/state/.sessions/strategist.session-id`), persisted the same way `src/ai.ts` does it today. This is critical: each role needs continuity across rounds, but roles must **not** share a session or they'll bleed personas. The Telegram bot's session stays separate.
+Each role gets its **own** `.session-id` file, stored **inside the crew sub-package** at `crew/projects/<slug>/.sessions/<role>.session-id`. Never at the repo root. Never shared with the bot's `.session-id`. Persistence follows the same read/write pattern as `src/ai.ts` but the paths are fully scoped to `crew/`.
+
+Each role needs continuity across rounds, but roles must **not** share a session or they'll bleed personas. The Telegram bot's session stays separate — in fact the bot and the crew can't even see each other's session files.
 
 ## Agent permissions
 
-Mirror `src/ai.ts`:
+Similar shape to `src/ai.ts` but every path scoped to `crew/`:
 - `permissionMode: 'bypassPermissions'`, `allowDangerouslySkipPermissions: true`
-- `cwd: projects/<slug>/` — sandbox each agent to its project directory so it can't accidentally edit the repo's source
-- `settingSources: ['project', 'user', 'local']` — lets us drop per-role `.claude/settings.json` later if a role needs custom tools (e.g. Analyst gets web fetch, CTO gets shell)
+- `cwd: crew/projects/<slug>/` — each agent's working directory is the project folder inside `crew/`. Agents cannot see `../../src/` or `../../package.json` or the repo's `.claude/` — they're sandboxed to their own project.
+- `settingSources: ['project', 'user', 'local']` — with `cwd` scoped to the project folder, "project" settings resolve to `crew/projects/<slug>/.claude/` (if any) rather than the repo root's `.claude/`. We can drop a `crew/.claude/settings.json` later for crew-wide tool configs without touching the root one.
 - Allow Read/Edit/Write/Glob/Grep by default. Deny Bash by default except for CTO, and even there scope it.
+- **Anthropic API key / credentials**: read from `crew/.env` (not repo root `.env`, which the bot uses). If both files exist they can hold the same key — that's the user's choice — but the crew never reaches into the root `.env`.
 
 ## What the human does
 
