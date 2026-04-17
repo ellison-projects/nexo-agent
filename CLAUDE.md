@@ -27,6 +27,10 @@ Four small files, each a single responsibility:
   - **Agent permissions.** Runs with `permissionMode: 'bypassPermissions'`, `allowDangerouslySkipPermissions: true`, `cwd: /root/code/nexo-agent`, and `settingSources: ['project', 'user']` — the agent reads this repo's `.claude/` config and can freely use Read/Glob/Grep. The system prompt frames it as a dev-support teammate.
 - `src/env.ts` — fails fast on missing `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`.
 
+## Interpreting short commands from the user
+
+When the user says a single word like "restart", "logs", "reset", "status" etc., first check `package.json` scripts — it's almost always a reference to one of those. If there's no obvious match or multiple plausible ones, ask before acting.
+
 ## Runtime constraints worth knowing
 
 - **Single-instance only.** `ecosystem.config.cjs` pins `instances: 1, exec_mode: 'fork'`, and `npm run restart` `pkill`s stray `tsx` processes first. Two bots polling the same `getUpdates` offset will duplicate replies and fight over `.session-id`.
