@@ -32,7 +32,7 @@ repo root/
 │   └── state.ts                    # read/write helpers for the project state files
 └── roles/
     ├── strategist/ROLE.md          # CEO — owns the plan, picks direction, reads market signals
-    ├── builder/ROLE.md             # Engineer — designs & builds the product / infra
+    ├── engineer/ROLE.md            # Software engineer — writes code, builds products/scripts/integrations
     ├── marketer/ROLE.md            # Content — TikTok scripts, hooks, posting schedule
     └── analyst/ROLE.md             # Research — comment mining, competitor scans, demand signals
 ```
@@ -46,18 +46,18 @@ Mapped directly to what the PDF says the work is:
 | Role | Owns | Typical turn output |
 |---|---|---|
 | **Strategist** (CEO) | `plan.md`, picking the business, 90-day targets, pivots | Updates plan; reconciles conflicts between other roles; picks what ships next |
-| **Builder** (Engineer) | Product design, infra, pricing mechanics, pre-sell page | Tech decisions; build tasks; what the human needs to click/sign up for |
+| **Software Engineer** | Actual code — vibe-coded apps, SaaS, scrapers, landing pages, scripts. Also: code-level infra (Dockerfiles, deploy configs, API integrations) | Commits to a `build/` subfolder in the project; tech decisions; open source/lib picks |
 | **Marketer** (Content) | TikTok/Reels/Shorts scripts, hooks, posting cadence | Video briefs; 5-video content calendar; cross-post plan |
 | **Analyst** (Research) | Comment mining, competitor scans, audience demand signals | "Top 3 demand signals from today's comments"; pricing benchmarks; pivot recommendations |
 
-Start with 4. If it turns out the analyst and strategist overlap too much, collapse to 3.
+The Software Engineer writes code — not the same as clicking around in Stripe or signing up for Gumroad. No-code platform setup (Stripe dashboard, Gumroad, Discord, Skool) stays with the human, as it does in the PDF; whichever role needs it recommends the platform and the human does the signup.
 
 ## Round-robin loop
 
 A **round** is one pass through all roles. A **cycle** is one full day's worth of rounds (default: 1 round/day, configurable).
 
 ```
-for each role in [strategist, builder, marketer, analyst]:
+for each role in [strategist, engineer, marketer, analyst]:
   1. load brief.md + state/*.md + last N transcripts
   2. prompt the role: "Here's the state. Here's your job. What do you change / add / recommend?"
   3. let the agent use Edit/Write on files under state/ (scoped via cwd)
@@ -68,7 +68,7 @@ then (synthesis step):
      and writes state/daily/YYYY-MM-DD.md — the concrete plan for the human tomorrow
 ```
 
-Why round-robin and not parallel: sequential turns mean each role reacts to the previous role's edits. The Marketer sees what the Builder just decided to ship; the Strategist synthesizes at the end. Parallel runs would race on file edits and produce incoherent plans.
+Why round-robin and not parallel: sequential turns mean each role reacts to the previous role's edits. The Marketer sees what the Engineer just decided to ship; the Strategist synthesizes at the end. Parallel runs would race on file edits and produce incoherent plans.
 
 Why Strategist closes the round: matches the PDF's framing — the human's one real job is saying yes/no, and the Strategist's job is to tee up that decision.
 
@@ -90,7 +90,7 @@ Every round ends by writing `state/daily/YYYY-MM-DD.md` with a fixed shape so it
 
 ## What the crew will work on next round
 - Strategist: ...
-- Builder: ...
+- Engineer: ...
 - Marketer: ...
 - Analyst: ...
 
@@ -120,8 +120,8 @@ Each role gets its **own** `.session-id` file (e.g. `projects/<slug>/state/.sess
 Mirror `src/ai.ts`:
 - `permissionMode: 'bypassPermissions'`, `allowDangerouslySkipPermissions: true`
 - `cwd: projects/<slug>/` — sandbox each agent to its project directory so it can't accidentally edit the repo's source
-- `settingSources: ['project', 'user', 'local']` — lets us drop per-role `.claude/settings.json` later if a role needs custom tools (e.g. Analyst gets web fetch, Builder gets shell)
-- Allow Read/Edit/Write/Glob/Grep by default. Deny Bash by default except for Builder, and even there scope it.
+- `settingSources: ['project', 'user', 'local']` — lets us drop per-role `.claude/settings.json` later if a role needs custom tools (e.g. Analyst gets web fetch, Engineer gets shell)
+- Allow Read/Edit/Write/Glob/Grep by default. Deny Bash by default except for Engineer, and even there scope it.
 
 ## What the human does
 
@@ -135,13 +135,13 @@ Matching the PDF's "human in the loop" framing:
 
 ## Open questions for the user
 
-1. **Number of roles** — 4 (Strategist / Builder / Marketer / Analyst) or collapse to 3? Gut says 4 is worth trying first.
+1. ~~**Number of roles**~~ — **decided: 4** (Strategist / Software Engineer / Marketer / Analyst).
 2. **Model per role** — all Sonnet, or give Strategist Opus and the rest Sonnet? Opus everywhere = expensive but probably worth it given the whole premise is "AI is the employee."
 3. **Round cadence** — 1 round/day (matches PDF's daily posting rhythm) or run multiple rounds on big days (launch, pivot)? Default 1/day.
 4. **Comment ingestion** — for now, human pastes exported comments into a file. Robbie used Apify. Do we wire Apify/TikTok scraping into the Analyst later, or keep it manual to stay simple?
 5. **Where does `projects/` live** — inside the repo (gitignored) or outside (e.g. `~/biz/`)? Gitignored-inside is simplest for v1.
 6. **Telegram integration** — should the existing bot become the mobile UI for the crew (`/crew status`, `/crew run`, daily plan pushed as a Telegram message)? Probably yes, but as a v2 — ship the CLI first.
-7. **TikTok/Stripe/Gumroad credentials** — the agents will propose these actions but the human signs up. Confirmed, or do we want the Builder to have any browser-automation ability at some point?
+7. **TikTok/Stripe/Gumroad credentials** — the agents will propose these actions but the human signs up. Confirmed, or do we want the Engineer to have any browser-automation ability at some point?
 
 ## Non-goals (for v1)
 
