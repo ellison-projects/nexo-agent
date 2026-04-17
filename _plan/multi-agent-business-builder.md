@@ -135,9 +135,30 @@ Whichever triggers first:
 - `--until HH:MM` — wall-clock deadline (default: 07:00 local)
 - `--rounds N` — hard cap on round count (default: 30)
 - `--budget $X` — token-cost ceiling (default: $20/session); tallied from the SDK's usage events
-- Converged: 3 rounds in a row where the Strategist's synthesis flags "no material change to Top-10"
+- **Confidence converged**: every one of the 4 agents rates the current top pick ≥80% likely to hit the goal, each with a one-line reason
 
 All four are ORed. Any one trips, session exits clean, final daily plan stays on disk.
+
+### Confidence signal
+
+At the end of each agent's turn — before seeing the other agents' scores this round — they answer one question: *"What's your confidence (0–100%) that the current top pick gets us to $1K in pre-sales, and why in one sentence?"*
+
+Stored in a `## Confidence` section at the top of `working.md`:
+
+```
+## Confidence on top pick: "AI TikTok hook generator for Shopify stores"
+- strategist: 85% — comments are signaling demand, pricing validated at $29
+- cto: 90% — minimal build, Gumroad + OpenAI API, 2 days to working MVP
+- marketer: 75% — hook lands but the niche might be too narrow
+- analyst: 60% — 3 competitors already doing this, differentiation unclear
+```
+
+When all four cross 80%, we've converged and the session exits. Until then, the divergent scores are themselves valuable — they tell the next round what to attack. In the sketch above, Marketer and Analyst haven't bought in, so round N+1's work should target niche-size and competitor differentiation. The low scorers have the agenda.
+
+Two guardrails against agreement theater (LLMs over-agreeing to end the session):
+
+1. Each agent scores *before* the others this round are revealed — so they're not anchoring on a group consensus.
+2. A number alone doesn't count; the one-sentence reason is required. Vague reasons → Strategist flags it and the agent has to re-score with specifics.
 
 ### Cost to expect
 
@@ -147,11 +168,12 @@ Rough back-of-napkin: 4 roles × ~30s Opus turn × 20 rounds ≈ $5–$15/sessio
 
 ```
 $ npm run crew -- status my-biz
-Session: 2026-04-17 23:04 → 2026-04-18 06:47 (7h43m, 22 rounds, $11.80)
-Status: completed (hit --until)
-Today's plan: projects/my-biz/state/daily/2026-04-18.md
+Session: 2026-04-17 23:04 → 2026-04-18 05:32 (6h28m, 18 rounds, $9.40)
+Status: completed (confidence converged — all agents ≥80%)
+Today's plan: projects/my-biz/daily/2026-04-18.md
 
 Top pick: #3 — "Niche newsletter for CrossFit gym owners"
+Crew confidence: strategist 88, cto 92, marketer 85, analyst 82
 Next step for you: see the 2 checkboxes at bottom of the daily plan.
 ```
 
@@ -185,6 +207,13 @@ hooks for Shopify stores" as the business. Pre-sell page is drafted
 Link integration. Marketer already wrote the launch video script.
 Blocker: human hasn't confirmed $29 price point yet (question in
 questions.md).
+
+## Confidence on top pick
+- strategist: 85% — comments signaling demand, pricing validated
+- cto: 90% — Gumroad + API, 2-day MVP
+- marketer: 75% — hook lands but niche might be too narrow
+- analyst: 60% — 3 competitors doing this, differentiation unclear
+→ Not yet converged (need all ≥80%). Next round's work: attack niche-size and differentiation.
 
 ## The 90-day plan
 ...
