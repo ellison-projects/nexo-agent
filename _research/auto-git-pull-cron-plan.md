@@ -13,10 +13,11 @@ Keep `/root/code/nexo-agent` in sync with `origin/master` automatically, without
 4. Exit non-zero on real errors (network fail, non-fast-forward, etc.) so a future monitoring hook could catch it. "Dirty tree, skipped" is **not** an error — it's expected.
 
 ### "Pending local changes" — exact definition
-Treat the repo as dirty if **any** of these are true:
+Treat the repo as dirty (skip the pull) if **any** of these are true:
 - `git status --porcelain` returns any output (modified, staged, untracked non-ignored files).
 - Current branch has unpushed commits ahead of its upstream.
 - HEAD is detached (we don't know where to pull to — skip).
+- Current branch is **not `master`** — we only auto-pull `master`. Any other branch is a human-driven workspace and gets left alone.
 
 This is conservative on purpose: we'd rather skip a pull than risk stomping work-in-progress.
 
@@ -71,7 +72,7 @@ Document both so it's trivial to back out.
 2. **Auth** — stick with SSH (need to set up a passphrase-less deploy key readable by the cron user) or switch remote to HTTPS + token?
 3. **Log location** — `/var/log/nexo-agent-auto-pull.log` (needs root, which cron already is here) or keep it inside the repo's ignored dir?
 4. **Cron user** — run as root (matches current shell) or a dedicated user?
-5. **Branch scope** — only auto-pull when on `master`, or on any branch that has a tracking upstream? Default: only `master`, since auto-pulling arbitrary feature branches is surprising.
+5. ~~Branch scope~~ — **decided: master-only.** Any other branch is treated as "skip cleanly."
 
 ## Non-goals (explicitly out of scope)
 
