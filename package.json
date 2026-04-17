@@ -5,7 +5,7 @@
     "dev": "npx tsx --env-file=.env src/index.ts",
     "start": "pm2 start ecosystem.config.cjs",
     "stop": "pm2 stop telegram-bot",
-    "restart": "pm2 restart telegram-bot",
+    "restart": "pkill -f 'tsx.*src/index.ts' || true && pm2 restart telegram-bot",
     "logs": "pm2 logs telegram-bot",
     "status": "pm2 status"
   },
