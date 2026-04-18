@@ -1,5 +1,6 @@
+import { unlink } from 'node:fs/promises';
 import { env } from './env';
-import { editMessage, getUpdates, sendMessage } from './telegram';
+import { downloadPhoto, editMessage, getUpdates, sendMessage } from './telegram';
 import { generateFunnyReply } from './ai';
 
 async function skipBacklog(): Promise<number> {
@@ -18,13 +19,22 @@ async function main() {
                   for (const update of updates) {
                         offset = update.update_id + 1;
                         const msg = update.message;
-                        if (!msg?.text) continue;
+                        if (!msg) continue;
                         if (String(msg.chat.id) !== env.telegramChatId) continue;
 
-                        console.log(`You: ${msg.text}`);
+                        const text = msg.text ?? msg.caption ?? '';
+                        const largestPhoto = msg.photo?.at(-1);
+                        if (!text && !largestPhoto) continue;
+
+                        console.log(`You: ${text}${largestPhoto ? ' [+photo]' : ''}`);
                         const processingId = await sendMessage(msg.chat.id, '....').catch(() => null);
+
+                        let imagePath: string | null = null;
                         try {
-                              const reply = await generateFunnyReply(msg.text);
+                              if (largestPhoto) {
+                                    imagePath = await downloadPhoto(largestPhoto.file_id);
+                              }
+                              const reply = await generateFunnyReply(text, imagePath);
                               console.log(`Bot: ${reply}`);
                               if (processingId !== null) {
                                     await editMessage(msg.chat.id, processingId, reply);
@@ -38,6 +48,10 @@ async function main() {
                                     await editMessage(msg.chat.id, processingId, errText).catch(() => {});
                               } else {
                                     await sendMessage(msg.chat.id, errText).catch(() => {});
+                              }
+                        } finally {
+                              if (imagePath) {
+                                    await unlink(imagePath).catch(() => {});
                               }
                         }
                   }

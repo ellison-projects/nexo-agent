@@ -11,9 +11,13 @@ let sessionId: string | null = (() => {
       }
 })();
 
-export async function generateFunnyReply(userMessage: string): Promise<string> {
+export async function generateFunnyReply(userMessage: string, imagePath?: string | null): Promise<string> {
+      const prompt = imagePath
+            ? `${userMessage}\n\nImage attached at: ${imagePath}\n(Use the Read tool to view it.)`.trim()
+            : userMessage;
+
       const response = query({
-            prompt: userMessage,
+            prompt,
             options: {
                   model: 'sonnet',
                   cwd: '/root/code/nexo-agent',
