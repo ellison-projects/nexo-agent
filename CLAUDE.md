@@ -4,9 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-**Nexo** — a personal AI assistant for a single user (me). Telegram is the current UI: messages in, agent replies out. Under the hood each message becomes a `query()` call to the Claude Agent SDK, and the returned result is edited back into a placeholder message the bot posted.
-
-Primary purpose is life-assistant stuff — people, todos, home maintenance, groceries, meals, plans, and whatever else I trust it with. But it's also a general-purpose helper: code review, ad-hoc research, random questions, writing help. Anything I throw at it.
+**Nexo** — a personal assistant agent with access to my custom NexoPRM platform (via the `nexo-prm` skill). Telegram is the current UI: messages in, agent replies out. Under the hood each message becomes a `query()` call to the Claude Agent SDK, and the returned result is edited back into a placeholder message the bot posted.
 
 ## Capabilities
 
