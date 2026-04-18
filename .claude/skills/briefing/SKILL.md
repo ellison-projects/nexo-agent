@@ -1,18 +1,13 @@
 ---
 name: briefing
-description: Use when Matt wants a briefing — a snapshotted, chief-of-staff style review of his NexoPRM state. Fetches the briefing endpoint, writes a timestamped snapshot to `briefings/`, and reviews progress against the prior snapshot (completed, new, still open, stuck). Also handles retrospective review across prior snapshots. Examples: "brief me", "daily briefing", "morning briefing", "give me a briefing", "review my week", "what did I finish since Monday", "compare to yesterday's briefing".
+description: Use when Matt wants a generic briefing without a clear forward-looking or backward-looking intent — the catch-all. Fetches the briefing endpoint, writes a timestamped snapshot to `briefings/`, and reviews progress since the prior snapshot (completed, new, still open). Also the canonical spec for snapshot mechanics — the `look-ahead` and `look-back` skills reference it. For "what's next / plan my day" framing use `look-ahead`. For "what got done / review my week" use `look-back`. Examples: "brief me", "daily briefing", "give me a briefing", "catch me up".
 ---
 
 # Briefing skill
 
-Personal chief-of-staff-style review, grounded in NexoPRM's briefing endpoint plus a local snapshot history. Matt wants to see what he's completed, what's lingering, and what deserves attention — not just a raw todo dump. For a quick todos-only rollup without snapshotting, the `nexo-prm` skill's "debrief" flow is the right tool instead.
+Generic catch-all briefing. Chief-of-staff-style review, grounded in NexoPRM's briefing endpoint. For a quick todos-only rollup without snapshotting, the `nexo-prm` skill's "debrief" flow is the right tool instead. For forward-looking decision framing, use `look-ahead`. For retrospective "what got done" framing, use `look-back`.
 
-## Modes
-
-- **Fresh briefing** (default): fetch live, snapshot, diff against prior snapshot, review.
-- **Retrospective**: read existing snapshots to review progress across a time window.
-
-The user's wording decides which. Don't pre-fetch.
+This file also holds the canonical snapshot-mechanics spec (storage, filename, error handling) that the sibling skills reference. If you change the storage rules, change them here.
 
 ## Snapshot storage
 
@@ -78,17 +73,6 @@ Worth your attention:
 - Omit any section with zero entries. If everything is empty, say: *"Nothing open. You're clear."*
 - If the user's goals or priorities would sharpen the advice, read `docs/matt/goals.md` or `docs/matt/preferences.md` before writing the "Worth your attention" line.
 - Never invent items, ids, or status changes. If the diff is ambiguous (e.g. id vanished — completed or dismissed?), say so.
-
-## Retrospective flow
-
-Triggered by wording like *"what did I finish this week"*, *"compare to Monday's briefing"*, *"how's my week looking"*.
-
-1. List `briefings/` sorted.
-2. Pick the snapshot closest to the start of the requested window (earliest in range) and the latest snapshot in range (or the newest overall if the window extends to now).
-3. Diff them the same way as the fresh flow.
-4. If the window has no snapshots, say so: *"I only have snapshots from <date> onward — nothing covers that period."*
-
-Do **not** fetch a fresh briefing in retrospective mode unless the user explicitly asks for one. The point is historical.
 
 ## Voice and constraints
 
