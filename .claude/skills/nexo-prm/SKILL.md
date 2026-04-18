@@ -1,11 +1,13 @@
 ---
 name: nexo-prm
-description: Use when the user wants to read or write their personal relationship data in NexoPRM — people, moments (timestamped observations about someone), things to remember, AI reminders, relationships, lists, connection groups, linked people, working notes (plans/todos), areas of focus, meals, food log, or groceries. Invoke for requests like "log that Sarah mentioned X", "who is Alex's birthday", "add milk to my groceries", "what's on my plan", "remind me that Jamie prefers texting". Calls the NexoPRM Agent API at app.nexoprm.com.
+description: Use when the user wants to read or write their personal relationship data in NexoPRM — people, moments (timestamped observations about someone), things to remember, AI reminders, relationships, lists, connection groups, linked people, working notes (plans/todos), areas of focus, meals, food log, groceries, or home items (household chores/maintenance). Also handles "debrief" — a read-only roll-up of open todos across home, groceries, and the current plan. Invoke for requests like "log that Sarah mentioned X", "who is Alex's birthday", "add milk to my groceries", "what's on my plan", "remind me that Jamie prefers texting", "debrief me", or "what are my open todos". Calls the NexoPRM Agent API at app.nexoprm.com.
 ---
 
 # NexoPRM Agent API
 
 Personal-relationship-manager API. Every request uses a god-mode bearer token plus a per-user impersonation header.
+
+**Full API reference (source of truth):** https://app.nexoprm.com/agentapi/llm.md — fetch this if an endpoint or field shape isn't covered below, or if a call 404s / rejects unexpectedly (the API may have changed since this skill was last updated).
 
 ## Auth
 
@@ -67,6 +69,10 @@ All list endpoints accept `limit` (default 50, max 200) and `offset` (default 0)
 ### Auth & meta
 - `GET /api/agent/me` — verify token, resolve impersonated user. Returns `{ key, user }`.
 - `GET /api/agent/users` — list all users.
+
+### Briefing (one-shot situational awareness)
+Read-only roll-up of the user's whole state. Use for open-ended prompts ("debrief me", "what's going on", "catch me up") and as grounded context before answering anything broad. Window is ~14 days forward; 7 days back for recent moments.
+- `GET /api/agent/briefing` — no query params. Response top-level keys: `generated_at`, `window_days`, `user`, `pillars`, `goals`, `trigger_list`, `upcoming_important_dates`, `ai_reminders` (`{ overdue, upcoming }`), `working_note_reminders`, `things_to_remember`, `recent_moments`, `stale_people`, `grocery_items`, `home_items`, `meal_plans`. Drill into dedicated endpoints only when you need more than the briefing contains.
 
 ### People
 - `GET /api/agent/people?q=&limit=&offset=` — search by name/email/phone substring.
@@ -151,6 +157,17 @@ At most one active list per user. Creating a new list retires the old one. `{id}
 - `POST /api/agent/groceries/lists/{id|active}/items` — `{ name, note? }`.
 - `PATCH /api/agent/groceries/items/{itemId}` — writable: `name`, `note`, `checked`. Setting `checked: true` auto-sets `checked_at`; `false` clears it.
 - `DELETE /api/agent/groceries/items/{itemId}?confirm=true`
+
+### Home items
+Household maintenance / chores ("replace smoke alarm batteries", "regrout shower"). One implicit list per user — no parent list resource. "Open" = `done_at IS NULL`.
+- `GET /api/agent/home-items` — open items only by default. Pass `?done=true` to include completed. Returns `{ home_items: [...] }`; each row has `note_count`.
+- `POST /api/agent/home-items` — `{ title }` required. Returns `{ home_item }`, 201.
+- `GET /api/agent/home-items/{id}` — returns `{ home_item, notes }`.
+- `PATCH /api/agent/home-items/{id}` — writable: `title`, `done_at` (ISO timestamp to mark done, `null` to reopen).
+- `DELETE /api/agent/home-items/{id}?confirm=true` — cascades to notes.
+- `POST /api/agent/home-items/{id}/notes` — `{ content }`. Returns `{ note }`, 201.
+- `PATCH /api/agent/home-item-notes/{noteId}` — writable: `content`.
+- `DELETE /api/agent/home-item-notes/{noteId}?confirm=true`
 
 ### Audit log (read-only)
 - `GET /api/agent/audit-log?userId=&since=&action=&resourceType=&limit=&offset=` — returns `{ entries: [...] }`. Bodies stored as SHA-256 digest, not raw.
@@ -362,6 +379,53 @@ If no "Home" heading exists, ask:
 > "I don't see a 'Home' heading on your current plan. Create it, or add the item at the top level?"
 
 Otherwise POST with `parent_id: "900"`.
+
+---
+
+### Flow D — Debrief (todos rollup via the briefing endpoint)
+
+**User:** "Debrief." (also: "what are my open todos?", "summary of my todos")
+
+Single-call, read-only. The briefing endpoint already rolls up everything Debrief needs — don't recreate it from individual calls.
+
+**Step 1. Fetch the briefing.**
+
+```bash
+curl -s "https://app.nexoprm.com/api/agent/briefing" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User: $NEXO_USER"
+```
+
+**Step 2. Pick out the three todo-relevant sections.** The briefing has many more fields (pillars, goals, stale people, etc.); ignore them for Debrief. If the user follows up with something broader, reach back into the same response.
+
+- `home_items` — open household chores.
+- `grocery_items` — items on the active grocery list.
+- `working_note_reminders` — plan items flagged as due/overdue.
+
+Trust the briefing — don't pad the output with extra calls to `/working-notes/latest` or the grocery/home endpoints. If a field looks incomplete, tell the user so they can fix the briefing server-side.
+
+**Step 3. Render grouped, with ids so the user can check things off in a follow-up.**
+
+> **Debrief — 9 open**
+>
+> **Home (3):**
+> - #124 Replace smoke alarm batteries
+> - #131 Regrout shower
+> - #140 Hang picture in hallway
+>
+> **Groceries (2):**
+> - #3041 milk
+> - #3042 eggs
+>
+> **Plan reminders (4):**
+> - #905 Call the plumber
+> - #907 Draft Q2 plan
+> - #910 Book dentist
+> - #913 Email landlord
+
+**Empty handling.**
+- Any section with zero entries → omit it.
+- All three empty → "Nothing open. You're clear."
 
 ---
 
