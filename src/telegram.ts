@@ -24,24 +24,69 @@ export type TelegramUpdate = {
       };
 };
 
-export async function sendMessage(chatId: number, text: string): Promise<number> {
-      const res = await fetch(`${API}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: chatId, text }),
+function escapeHtml(s: string): string {
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Convert the markdown subset Claude typically emits into Telegram-supported HTML.
+// Telegram HTML mode supports: <b>, <i>, <s>, <u>, <code>, <pre>, <a>, <blockquote>.
+export function mdToHtml(text: string): string {
+      const placeholders: string[] = [];
+      const stash = (html: string): string => {
+            placeholders.push(html);
+            return `\u0000${placeholders.length - 1}\u0000`;
+      };
+
+      let out = text.replace(/```([\w+-]*)\n?([\s\S]*?)```/g, (_, lang: string, body: string) => {
+            const inner = escapeHtml(body.replace(/\n$/, ''));
+            return stash(lang ? `<pre><code class="language-${escapeHtml(lang)}">${inner}</code></pre>` : `<pre>${inner}</pre>`);
       });
-      if (!res.ok) throw new Error(`Telegram sendMessage failed: ${res.status} ${await res.text()}`);
+
+      out = out.replace(/`([^`\n]+)`/g, (_, body: string) => stash(`<code>${escapeHtml(body)}</code>`));
+
+      out = out.replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (_, label: string, url: string) => {
+            return stash(`<a href="${escapeHtml(url)}">${escapeHtml(label)}</a>`);
+      });
+
+      out = escapeHtml(out);
+
+      out = out.replace(/^(#{1,6})\s+(.+)$/gm, (_, _hashes: string, title: string) => `<b>${title}</b>`);
+      out = out.replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
+      out = out.replace(/(^|[\s(])_([^_\n]+)_(?=[\s).,!?;:]|$)/g, '$1<i>$2</i>');
+      out = out.replace(/~~([^~\n]+)~~/g, '<s>$1</s>');
+
+      return out.replace(/\u0000(\d+)\u0000/g, (_, i: string) => placeholders[Number(i)]);
+}
+
+async function postMessage(endpoint: string, payload: Record<string, unknown>, text: string): Promise<Response> {
+      const html = mdToHtml(text);
+      const tryPost = (body: Record<string, unknown>) =>
+            fetch(`${API}/${endpoint}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(body),
+            });
+
+      const htmlRes = await tryPost({ ...payload, text: html, parse_mode: 'HTML' });
+      if (htmlRes.ok) return htmlRes;
+      // Telegram rejects malformed HTML with 400; fall back to plain text so the user still gets the message.
+      if (htmlRes.status === 400) {
+            console.error(`Telegram ${endpoint} HTML rejected, retrying as plain text:`, await htmlRes.clone().text());
+            const plainRes = await tryPost({ ...payload, text });
+            if (plainRes.ok) return plainRes;
+            throw new Error(`Telegram ${endpoint} failed: ${plainRes.status} ${await plainRes.text()}`);
+      }
+      throw new Error(`Telegram ${endpoint} failed: ${htmlRes.status} ${await htmlRes.text()}`);
+}
+
+export async function sendMessage(chatId: number, text: string): Promise<number> {
+      const res = await postMessage('sendMessage', { chat_id: chatId }, text);
       const data = (await res.json()) as { ok: boolean; result: { message_id: number } };
       return data.result.message_id;
 }
 
 export async function editMessage(chatId: number, messageId: number, text: string): Promise<void> {
-      const res = await fetch(`${API}/editMessageText`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: chatId, message_id: messageId, text }),
-      });
-      if (!res.ok) throw new Error(`Telegram editMessageText failed: ${res.status} ${await res.text()}`);
+      await postMessage('editMessageText', { chat_id: chatId, message_id: messageId }, text);
 }
 
 export async function getUpdates(offset: number, timeoutSeconds = 30): Promise<TelegramUpdate[]> {
