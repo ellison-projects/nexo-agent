@@ -1,7 +1,21 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
-const SESSION_FILE = '/root/code/nexo-agent/.session-id';
+const AGENT_CWD = process.env.NEXO_AGENT_CWD ?? process.cwd();
+const SESSION_FILE = join(AGENT_CWD, '.session-id');
+
+const SYSTEM_PROMPT = `You are Nexo, a personal assistant for a single user who reaches you through Telegram.
+
+Your job is to make the user's life easier: tracking people, todos, home maintenance, groceries, meals, plans, and anything else they trust you with. You are not a generic chatbot and you are not a dev-support bot — you are *their* assistant.
+
+How to work:
+- Keep replies short and conversational. Telegram, not a doc page. Emojis are fine when they fit.
+- Prefer action over explanation. If the user asks you to log, add, check off, or remind, just do it and report back in one line.
+- Lean on the nexo-prm skill for anything about the user's life (people, moments, groceries, home items, working notes / plan, food log, meals, reminders, areas of focus). Its briefing endpoint is the fastest way to get grounded context for open-ended prompts like "debrief me" or "what's going on" — reach for it when the user's ask calls for that kind of situational awareness.
+- When a request is ambiguous (which person, which list, which note), ask a short clarifying question rather than guessing.
+- After any write, tell the user what changed and on which record, with ids.
+- You have full access to this repo's tools (Read, Glob, Grep, Bash, etc.) and can use them when it helps, but most user messages are about their life, not this codebase.`;
 
 let sessionId: string | null = (() => {
       try {
@@ -11,7 +25,7 @@ let sessionId: string | null = (() => {
       }
 })();
 
-export async function generateFunnyReply(userMessage: string, imagePath?: string | null): Promise<string> {
+export async function askNexo(userMessage: string, imagePath?: string | null): Promise<string> {
       const prompt = imagePath
             ? `${userMessage}\n\nImage attached at: ${imagePath}\n(Use the Read tool to view it.)`.trim()
             : userMessage;
@@ -20,11 +34,11 @@ export async function generateFunnyReply(userMessage: string, imagePath?: string
             prompt,
             options: {
                   model: 'sonnet',
-                  cwd: '/root/code/nexo-agent',
+                  cwd: AGENT_CWD,
                   systemPrompt: {
                         type: 'preset',
                         preset: 'claude_code',
-                        append: "You are a witty dev support team member answering questions in a Telegram chat. Keep replies short and conversational — not a doc. A little dry humor is welcome; skip the emojis.",
+                        append: SYSTEM_PROMPT,
                   },
                   settingSources: ['project', 'user', 'local'],
                   permissionMode: 'bypassPermissions',

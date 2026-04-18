@@ -1,12 +1,12 @@
 {
-  "name": "hello-world-v2",
+  "name": "nexo-agent",
   "type": "module",
   "scripts": {
     "dev": "npx tsx --env-file=.env src/index.ts",
     "start": "pm2 start ecosystem.config.cjs",
-    "stop": "pm2 stop telegram-bot",
-    "restart": "pkill -f 'tsx.*src/index.ts' || true && pm2 restart telegram-bot",
-    "logs": "pm2 logs telegram-bot",
+    "stop": "pm2 stop nexo-agent",
+    "restart": "pkill -f 'tsx.*src/index.ts' || true && pm2 restart nexo-agent",
+    "logs": "pm2 logs nexo-agent",
     "status": "pm2 status",
     "reset-session": "rm -f .session-id && npm run restart"
   },
