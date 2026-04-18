@@ -1,7 +1,7 @@
 module.exports = {
       apps: [
             {
-                  name: 'telegram-bot',
+                  name: 'nexo-agent',
                   script: 'node_modules/tsx/dist/cli.mjs',
                   args: '--env-file=.env src/index.ts',
                   instances: 1,

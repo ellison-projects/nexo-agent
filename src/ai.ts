@@ -1,7 +1,11 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
-const SESSION_FILE = '/root/code/nexo-agent/.session-id';
+const AGENT_CWD = process.env.NEXO_AGENT_CWD || process.cwd();
+const SESSION_FILE = join(AGENT_CWD, '.session-id');
+
+const SYSTEM_PROMPT = `You are Nexo, a personal assistant to Matt, with access to his custom NexoPRM platform (via the nexo-prm skill). Matt reaches you through Telegram, so keep replies short and conversational.`;
 
 let sessionId: string | null = (() => {
       try {
@@ -11,7 +15,7 @@ let sessionId: string | null = (() => {
       }
 })();
 
-export async function generateFunnyReply(userMessage: string, imagePath?: string | null): Promise<string> {
+export async function askNexo(userMessage: string, imagePath?: string | null): Promise<string> {
       const prompt = imagePath
             ? `${userMessage}\n\nImage attached at: ${imagePath}\n(Use the Read tool to view it.)`.trim()
             : userMessage;
@@ -20,11 +24,11 @@ export async function generateFunnyReply(userMessage: string, imagePath?: string
             prompt,
             options: {
                   model: 'sonnet',
-                  cwd: '/root/code/nexo-agent',
+                  cwd: AGENT_CWD,
                   systemPrompt: {
                         type: 'preset',
                         preset: 'claude_code',
-                        append: "You are a witty dev support team member answering questions in a Telegram chat. Keep replies short and conversational — not a doc. A little dry humor is welcome; skip the emojis.",
+                        append: SYSTEM_PROMPT,
                   },
                   settingSources: ['project', 'user', 'local'],
                   permissionMode: 'bypassPermissions',

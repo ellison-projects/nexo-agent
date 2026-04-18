@@ -1,7 +1,7 @@
 import { unlink } from 'node:fs/promises';
 import { env } from './env';
 import { downloadPhoto, editMessage, getUpdates, sendMessage } from './telegram';
-import { generateFunnyReply } from './ai';
+import { askNexo } from './ai';
 
 async function skipBacklog(): Promise<number> {
       const pending = await getUpdates(0, 0);
@@ -10,8 +10,8 @@ async function skipBacklog(): Promise<number> {
 
 async function main() {
       let offset = await skipBacklog();
-      console.log(`Listening for Telegram messages from chat ${env.telegramChatId}...`);
-      await sendMessage(Number(env.telegramChatId), 'bot started up 🚀').catch(() => {});
+      console.log(`Nexo listening for Telegram messages from chat ${env.telegramChatId}...`);
+      await sendMessage(Number(env.telegramChatId), 'Nexo online 🚀').catch(() => {});
 
       while (true) {
             try {
@@ -34,7 +34,7 @@ async function main() {
                               if (largestPhoto) {
                                     imagePath = await downloadPhoto(largestPhoto.file_id);
                               }
-                              const reply = await generateFunnyReply(text, imagePath);
+                              const reply = await askNexo(text, imagePath);
                               console.log(`Bot: ${reply}`);
                               if (processingId !== null) {
                                     await editMessage(msg.chat.id, processingId, reply);
