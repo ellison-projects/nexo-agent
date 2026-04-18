@@ -70,6 +70,10 @@ All list endpoints accept `limit` (default 50, max 200) and `offset` (default 0)
 - `GET /api/agent/me` — verify token, resolve impersonated user. Returns `{ key, user }`.
 - `GET /api/agent/users` — list all users.
 
+### Briefing (one-shot situational awareness)
+Read-only roll-up of the user's whole state. Use for open-ended prompts ("debrief me", "what's going on", "catch me up") and as grounded context before answering anything broad. Window is ~14 days forward; 7 days back for recent moments.
+- `GET /api/agent/briefing` — no query params. Response top-level keys: `generated_at`, `window_days`, `user`, `pillars`, `goals`, `trigger_list`, `upcoming_important_dates`, `ai_reminders` (`{ overdue, upcoming }`), `working_note_reminders`, `things_to_remember`, `recent_moments`, `stale_people`, `grocery_items`, `home_items`, `meal_plans`. Drill into dedicated endpoints only when you need more than the briefing contains.
+
 ### People
 - `GET /api/agent/people?q=&limit=&offset=` — search by name/email/phone substring.
 - `POST /api/agent/people` — only `name` required. Other fields: `email`, `phone`, `address`, `important_dates` (array of `{label, date, recurring}`), `relationship` (`{connectionType}`), `topics` (string array), `pinned_at`.
@@ -378,36 +382,25 @@ Otherwise POST with `parent_id: "900"`.
 
 ---
 
-### Flow D — Debrief (open todos across Home, Groceries, and the latest plan)
+### Flow D — Debrief (todos rollup via the briefing endpoint)
 
 **User:** "Debrief." (also: "what are my open todos?", "summary of my todos")
 
-Roll up everything the user can check off, from three sources in parallel. Read-only — never writes, never offers to create missing lists.
+Single-call, read-only. The briefing endpoint already rolls up everything Debrief needs — don't recreate it from individual calls.
 
-**Step 1. Fetch all three in parallel.**
+**Step 1. Fetch the briefing.**
 
 ```bash
-# Home — server already filters to open (done_at IS NULL)
-curl -s "https://app.nexoprm.com/api/agent/home-items" \
-  -H "Authorization: Bearer $NEXO_API_KEY" \
-  -H "X-Nexo-User: $NEXO_USER"
-
-# Active grocery list (404 if none)
-curl -s "https://app.nexoprm.com/api/agent/groceries/lists/active" \
-  -H "Authorization: Bearer $NEXO_API_KEY" \
-  -H "X-Nexo-User: $NEXO_USER"
-
-# Latest working note / plan (404 if none)
-curl -s "https://app.nexoprm.com/api/agent/working-notes/latest" \
+curl -s "https://app.nexoprm.com/api/agent/briefing" \
   -H "Authorization: Bearer $NEXO_API_KEY" \
   -H "X-Nexo-User: $NEXO_USER"
 ```
 
-**Step 2. Filter client-side.**
+**Step 2. Pick out the three todo-relevant sections.** The briefing has many more fields (pillars, goals, stale people, etc.); ignore them for Debrief. If the user follows up with something broader, reach back into the same response.
 
-- **Home** — use `home_items` as-is.
-- **Groceries** — `items.filter(i => !i.checked)`.
-- **Plan** — `items.filter(i => !i.checked && !i.is_heading)`. Headings aren't todos.
+- `home_items` — open household chores.
+- `grocery_items` — items on the active grocery list.
+- `working_note_reminders` — plan items flagged as due/overdue. This is a *subset* of unchecked plan items (only those with a due trigger). If the user wants the full plan, call `GET /working-notes/latest` separately.
 
 **Step 3. Render grouped, with ids so the user can check things off in a follow-up.**
 
@@ -418,20 +411,19 @@ curl -s "https://app.nexoprm.com/api/agent/working-notes/latest" \
 > - #131 Regrout shower
 > - #140 Hang picture in hallway
 >
-> **Groceries (list #17, 2):**
+> **Groceries (2):**
 > - #3041 milk
 > - #3042 eggs
 >
-> **Plan (note #61, 4):**
+> **Plan reminders (4):**
 > - #905 Call the plumber
 > - #907 Draft Q2 plan
 > - #910 Book dentist
 > - #913 Email landlord
 
-**Empty / missing handling.**
-- Section with zero open items → omit it.
-- Groceries or plan endpoint returns 404 → omit that section. Do not offer to create one; Debrief is read-only.
-- Nothing open anywhere (or all three 404) → "Nothing open. You're clear."
+**Empty handling.**
+- Any section with zero entries → omit it.
+- All three empty → "Nothing open. You're clear."
 
 ---
 
