@@ -1,4 +1,5 @@
 import { unlink } from 'node:fs/promises';
+import { execSync } from 'node:child_process';
 import { env } from './env';
 import { downloadPhoto, editMessage, getUpdates, sendMessage } from './telegram';
 import { askNexo } from './ai';
@@ -8,10 +9,27 @@ async function skipBacklog(): Promise<number> {
       return pending.length ? pending[pending.length - 1].update_id + 1 : 0;
 }
 
+function gitStartupReport(): string {
+      try {
+            const dirty = execSync('git status --porcelain', { encoding: 'utf8' }).trim();
+            if (dirty) {
+                  return `⚠️ Pending local changes — skipping pull:\n${dirty}`;
+            }
+            const pull = execSync('git pull --ff-only', { encoding: 'utf8' }).trim();
+            if (/Already up to date/i.test(pull)) {
+                  return '✅ Repo up to date';
+            }
+            return `✅ Pulled latest:\n${pull}`;
+      } catch (err) {
+            return `Git check failed: ${(err as Error).message}`;
+      }
+}
+
 async function main() {
       let offset = await skipBacklog();
       console.log(`Nexo listening for Telegram messages from chat ${env.telegramChatId}...`);
-      await sendMessage(Number(env.telegramChatId), 'Nexo online 🚀').catch(() => {});
+      const gitReport = gitStartupReport();
+      await sendMessage(Number(env.telegramChatId), `Nexo online 🚀\n\n${gitReport}`).catch(() => {});
 
       while (true) {
             try {
