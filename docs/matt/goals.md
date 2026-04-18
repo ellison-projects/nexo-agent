@@ -8,12 +8,14 @@ Note: day-to-day priorities and areas of focus also live in NexoPRM (`areas-of-f
 
 ## Current focus
 
-<!-- What you're actively trying to move the needle on over the next few weeks/months. -->
+**Lawn Engine** is the main driver right now — building toward "Life 2.0." Day job (DoctorLogic) stays solid but shouldn't crowd out the bigger goal. Keeping momentum on side projects (Unabated, Declassified Records, Carfluent).
+
+*(For current week/sprint-level priorities, check NexoPRM working notes — that's the live plan.)*
 
 ## Longer-term goals
 
-<!-- 1–3 year horizon. Keep it short — the stuff that should color decisions. -->
+Build the next chapter — transitioning from employee to founder/builder. Lawn Engine is the vehicle. Stay healthy and present for family while making it happen.
 
 ## Explicit non-goals
 
-<!-- Things you are *not* trying to do, so Nexo doesn't push you toward them. -->
+Climbing the corporate ladder. Letting the day job consume the time/energy needed for what I'm building on the side.

@@ -6,20 +6,22 @@ High-level, durable facts about me. Fill in as you like — Nexo reads this when
 
 ## Bio
 
-<!-- A couple of sentences: who you are, background, anything you want Nexo to know up front. -->
+Software engineer juggling a full-time job with multiple side gigs. Builder by nature — always working on something.
 
 ## Location
 
-<!-- Where you live / work from. Time zone. -->
+Near Dallas, Texas. Work from home.
 
 ## Work
 
-<!-- What you do, current company/projects, role. -->
+- **Day job:** DoctorLogic (full-time software engineer)
+- **Main side project:** Lawn Engine (current focus for "Life 2.0")
+- **Other ventures:** Unabated, Declassified Records, Carfluent (advising/building)
 
 ## Household & family
 
-<!-- Partner, kids, pets, anyone who shows up in day-to-day life. Names only here; deeper details live in NexoPRM. -->
+Wife + 3 young kids: Jade, Jackson, Gideon (ages 6 months to 6 years). Mornings and evenings revolve around kid routines — school drop-off/pickup, activities, family time.
 
 ## Other context
 
-<!-- Anything else that's useful baseline context — health quirks, recurring commitments, long-running projects. -->
+**Time constraints:** Deep focus is limited. Weekdays: 1–2 hour blocks max. Weekends: 3–4 hours max, always around kid activities. Side project work happens at night and on weekends.
