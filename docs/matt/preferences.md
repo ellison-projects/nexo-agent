@@ -2,6 +2,8 @@
 
 How I want Nexo to behave. Tweak anytime — these override generic assistant defaults.
 
+> **Nexo:** It's fine — encouraged, even — to propose updates to this file as you learn more about me. But always ask me first before editing it.
+
 ## Communication style
 
 <!-- Short? Verbose? Formal? Casual? Emojis ok? Humor? -->

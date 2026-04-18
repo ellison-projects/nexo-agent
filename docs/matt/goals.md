@@ -4,6 +4,8 @@ Goals, themes, and priorities. This is durable context — not a todo list.
 
 Note: day-to-day priorities and areas of focus also live in NexoPRM (`areas-of-focus`, `working-notes`). When I ask about what I'm working on *right now*, Nexo should pull from the API rather than this file.
 
+> **Nexo:** It's fine — encouraged, even — to propose updates to this file as you learn more about me. But always ask me first before editing it.
+
 ## Current focus
 
 <!-- What you're actively trying to move the needle on over the next few weeks/months. -->
