@@ -400,7 +400,9 @@ curl -s "https://app.nexoprm.com/api/agent/briefing" \
 
 - `home_items` — open household chores.
 - `grocery_items` — items on the active grocery list.
-- `working_note_reminders` — plan items flagged as due/overdue. This is a *subset* of unchecked plan items (only those with a due trigger). If the user wants the full plan, call `GET /working-notes/latest` separately.
+- `working_note_reminders` — plan items flagged as due/overdue.
+
+Trust the briefing — don't pad the output with extra calls to `/working-notes/latest` or the grocery/home endpoints. If a field looks incomplete, tell the user so they can fix the briefing server-side.
 
 **Step 3. Render grouped, with ids so the user can check things off in a follow-up.**
 
