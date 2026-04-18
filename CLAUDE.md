@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Nexo** — a personal AI assistant for a single user (me). Telegram is the current UI: messages in, agent replies out. Under the hood each message becomes a `query()` call to the Claude Agent SDK, and the returned result is edited back into a placeholder message the bot posted.
 
-Nexo is intended to grow into a proper life assistant — access to people, todos, home maintenance, groceries, meals, plans, and whatever else I trust it with. Not a codebase Q&A bot, not a dev-support teammate.
+Primary purpose is life-assistant stuff — people, todos, home maintenance, groceries, meals, plans, and whatever else I trust it with. But it's also a general-purpose helper: code review, ad-hoc research, random questions, writing help. Anything I throw at it.
 
 ## Capabilities
 
@@ -14,7 +14,7 @@ The agent currently has:
 
 - **`nexo-prm` skill** (`.claude/skills/nexo-prm/`) — reads/writes my personal life data via the NexoPRM Agent API at `app.nexoprm.com`. Covers people, moments, things to remember, AI reminders, lists, connection groups, linked people, working notes / plans, areas of focus, meals, food log, groceries, and home items.
 - **Briefing endpoint** (`GET /api/agent/briefing`) — a one-call read-only roll-up of my open todos, plan items, reminders, recent moments, pinned people, etc. The agent should reach for this when I ask for situational awareness ("debrief me", "what's going on", "what's on my plate") rather than stitching it together from individual endpoints. Not pre-fetched — the agent decides when to call it.
-- **Standard Claude Code tools** — Read/Glob/Grep/Bash/etc. via the `claude_code` preset. Used when a task actually needs them; most user messages are about life, not this repo.
+- **Standard Claude Code tools** — Read/Glob/Grep/Bash/etc. via the `claude_code` preset. Available for any task that calls for them — codebase work, shell commands, research, etc.
 
 Additional skills will likely land here over time (calendar, email, etc.). When they do, list them in this section.
 
