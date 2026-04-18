@@ -15,11 +15,15 @@ function gitStartupReport(): string {
             if (dirty) {
                   return `⚠️ Pending local changes — skipping pull:\n${dirty}`;
             }
-            const pull = execSync('git pull --ff-only', { encoding: 'utf8' }).trim();
-            if (/Already up to date/i.test(pull)) {
-                  return '✅ Repo up to date';
+            const before = execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
+            execSync('git pull --ff-only', { encoding: 'utf8' });
+            const after = execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
+            if (before === after) {
+                  return '✅ No updates pulled — repo already up to date';
             }
-            return `✅ Pulled latest:\n${pull}`;
+            const commits = execSync(`git log --oneline ${before}..${after}`, { encoding: 'utf8' }).trim();
+            const count = commits.split('\n').length;
+            return `✅ Pulled ${count} new commit${count === 1 ? '' : 's'}:\n${commits}`;
       } catch (err) {
             return `Git check failed: ${(err as Error).message}`;
       }
