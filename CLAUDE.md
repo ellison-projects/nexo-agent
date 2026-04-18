@@ -6,6 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Nexo** — a personal assistant agent with access to my custom NexoPRM platform (via the `nexo-prm` skill). Telegram is the current UI: messages in, agent replies out. Under the hood each message becomes a `query()` call to the Claude Agent SDK, and the returned result is edited back into a placeholder message the bot posted.
 
+## About Matt (the user)
+
+<!-- Short one-liner that Nexo should always have loaded. Example: "Matt is a founder based in X, working on Y, living with Z." Fill in. -->
+
+Deeper personal context — bio, goals, preferences — lives in `docs/matt/`. Read the relevant file when the topic calls for it (e.g. `docs/matt/goals.md` when I ask about priorities, `docs/matt/preferences.md` when deciding how to respond). Not every message needs this; pull it in when it actually helps.
+
 ## Capabilities
 
 The agent currently has:
