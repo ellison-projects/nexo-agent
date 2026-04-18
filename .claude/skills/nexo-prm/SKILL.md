@@ -1,6 +1,6 @@
 ---
 name: nexo-prm
-description: Use when the user wants to read or write their personal relationship data in NexoPRM — people, moments (timestamped observations about someone), things to remember, AI reminders, relationships, lists, connection groups, linked people, working notes (plans/todos), areas of focus, meals, food log, or groceries. Invoke for requests like "log that Sarah mentioned X", "who is Alex's birthday", "add milk to my groceries", "what's on my plan", "remind me that Jamie prefers texting". Calls the NexoPRM Agent API at app.nexoprm.com.
+description: Use when the user wants to read or write their personal relationship data in NexoPRM — people, moments (timestamped observations about someone), things to remember, AI reminders, relationships, lists, connection groups, linked people, working notes (plans/todos), areas of focus, meals, food log, groceries, or home items (household chores/maintenance). Also handles "debrief" — a read-only roll-up of open todos across home, groceries, and the current plan. Invoke for requests like "log that Sarah mentioned X", "who is Alex's birthday", "add milk to my groceries", "what's on my plan", "remind me that Jamie prefers texting", "debrief me", or "what are my open todos". Calls the NexoPRM Agent API at app.nexoprm.com.
 ---
 
 # NexoPRM Agent API
@@ -153,6 +153,17 @@ At most one active list per user. Creating a new list retires the old one. `{id}
 - `POST /api/agent/groceries/lists/{id|active}/items` — `{ name, note? }`.
 - `PATCH /api/agent/groceries/items/{itemId}` — writable: `name`, `note`, `checked`. Setting `checked: true` auto-sets `checked_at`; `false` clears it.
 - `DELETE /api/agent/groceries/items/{itemId}?confirm=true`
+
+### Home items
+Household maintenance / chores ("replace smoke alarm batteries", "regrout shower"). One implicit list per user — no parent list resource. "Open" = `done_at IS NULL`.
+- `GET /api/agent/home-items` — open items only by default. Pass `?done=true` to include completed. Returns `{ home_items: [...] }`; each row has `note_count`.
+- `POST /api/agent/home-items` — `{ title }` required. Returns `{ home_item }`, 201.
+- `GET /api/agent/home-items/{id}` — returns `{ home_item, notes }`.
+- `PATCH /api/agent/home-items/{id}` — writable: `title`, `done_at` (ISO timestamp to mark done, `null` to reopen).
+- `DELETE /api/agent/home-items/{id}?confirm=true` — cascades to notes.
+- `POST /api/agent/home-items/{id}/notes` — `{ content }`. Returns `{ note }`, 201.
+- `PATCH /api/agent/home-item-notes/{noteId}` — writable: `content`.
+- `DELETE /api/agent/home-item-notes/{noteId}?confirm=true`
 
 ### Audit log (read-only)
 - `GET /api/agent/audit-log?userId=&since=&action=&resourceType=&limit=&offset=` — returns `{ entries: [...] }`. Bodies stored as SHA-256 digest, not raw.
@@ -364,6 +375,63 @@ If no "Home" heading exists, ask:
 > "I don't see a 'Home' heading on your current plan. Create it, or add the item at the top level?"
 
 Otherwise POST with `parent_id: "900"`.
+
+---
+
+### Flow D — Debrief (open todos across Home, Groceries, and the latest plan)
+
+**User:** "Debrief." (also: "what are my open todos?", "summary of my todos")
+
+Roll up everything the user can check off, from three sources in parallel. Read-only — never writes, never offers to create missing lists.
+
+**Step 1. Fetch all three in parallel.**
+
+```bash
+# Home — server already filters to open (done_at IS NULL)
+curl -s "https://app.nexoprm.com/api/agent/home-items" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User: $NEXO_USER"
+
+# Active grocery list (404 if none)
+curl -s "https://app.nexoprm.com/api/agent/groceries/lists/active" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User: $NEXO_USER"
+
+# Latest working note / plan (404 if none)
+curl -s "https://app.nexoprm.com/api/agent/working-notes/latest" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User: $NEXO_USER"
+```
+
+**Step 2. Filter client-side.**
+
+- **Home** — use `home_items` as-is.
+- **Groceries** — `items.filter(i => !i.checked)`.
+- **Plan** — `items.filter(i => !i.checked && !i.is_heading)`. Headings aren't todos.
+
+**Step 3. Render grouped, with ids so the user can check things off in a follow-up.**
+
+> **Debrief — 9 open**
+>
+> **Home (3):**
+> - #124 Replace smoke alarm batteries
+> - #131 Regrout shower
+> - #140 Hang picture in hallway
+>
+> **Groceries (list #17, 2):**
+> - #3041 milk
+> - #3042 eggs
+>
+> **Plan (note #61, 4):**
+> - #905 Call the plumber
+> - #907 Draft Q2 plan
+> - #910 Book dentist
+> - #913 Email landlord
+
+**Empty / missing handling.**
+- Section with zero open items → omit it.
+- Groceries or plan endpoint returns 404 → omit that section. Do not offer to create one; Debrief is read-only.
+- Nothing open anywhere (or all three 404) → "Nothing open. You're clear."
 
 ---
 
