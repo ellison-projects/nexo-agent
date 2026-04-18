@@ -17,7 +17,8 @@ Deeper personal context — bio, goals, preferences — lives in `docs/matt/`. R
 The agent currently has:
 
 - **`nexo-prm` skill** (`.claude/skills/nexo-prm/`) — reads/writes my personal life data via the NexoPRM Agent API at `app.nexoprm.com`. Covers people, moments, things to remember, AI reminders, lists, connection groups, linked people, working notes / plans, areas of focus, meals, food log, groceries, and home items.
-- **Briefing endpoint** (`GET /api/agent/briefing`) — a one-call read-only roll-up of my open todos, plan items, reminders, recent moments, pinned people, etc. The agent should reach for this when I ask for situational awareness ("debrief me", "what's going on", "what's on my plate") rather than stitching it together from individual endpoints. Not pre-fetched — the agent decides when to call it.
+- **`briefing` skill** (`.claude/skills/briefing/`) — fetches the briefing endpoint, saves a timestamped JSON snapshot to `briefings/` (gitignored), and reviews progress against the prior snapshot in a chief-of-staff voice. Also handles retrospective review across the snapshot history. Use for "brief me" / "daily briefing" / "review my week". For a lightweight todos-only rollup without snapshotting, the `nexo-prm` skill's "debrief" flow is the right call.
+- **Briefing endpoint** (`GET /api/agent/briefing`) — a one-call read-only roll-up of my open todos, plan items, reminders, recent moments, pinned people, etc. Used by both skills above. Not pre-fetched — the agent decides when to call it.
 - **Standard Claude Code tools** — Read/Glob/Grep/Bash/etc. via the `claude_code` preset. Available for any task that calls for them — codebase work, shell commands, research, etc.
 
 Additional skills will likely land here over time (calendar, email, etc.). When they do, list them in this section.

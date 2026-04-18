@@ -1,3 +1,4 @@
 node_modules
 .session-id
 bot.log
+briefings/
