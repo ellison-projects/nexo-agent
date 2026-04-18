@@ -7,6 +7,8 @@ description: Use when the user wants to read or write their personal relationshi
 
 Personal-relationship-manager API. Every request uses a god-mode bearer token plus a per-user impersonation header.
 
+**Full API reference (source of truth):** https://app.nexoprm.com/agentapi/llm.md — fetch this if an endpoint or field shape isn't covered below, or if a call 404s / rejects unexpectedly (the API may have changed since this skill was last updated).
+
 ## Auth
 
 Read from env:
