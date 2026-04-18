@@ -72,7 +72,7 @@ All list endpoints accept `limit` (default 50, max 200) and `offset` (default 0)
 
 ### Briefing (one-shot situational awareness)
 Read-only roll-up of the user's whole state. Use for open-ended prompts ("debrief me", "what's going on", "catch me up") and as grounded context before answering anything broad. Window is ~14 days forward; 7 days back for recent moments.
-- `GET /api/agent/briefing` — no query params. Response top-level keys: `generated_at`, `window_days`, `user`, `pillars`, `goals`, `trigger_list`, `upcoming_important_dates`, `ai_reminders` (`{ overdue, upcoming }`), `working_note_reminders`, `things_to_remember`, `recent_moments`, `stale_people`, `grocery_items`, `home_items`, `meal_plans`. Drill into dedicated endpoints only when you need more than the briefing contains.
+- `GET /api/agent/briefing` — no query params. Response top-level keys: `generated_at`, `window_days`, `user`, `pillars`, `goals`, `trigger_list`, `upcoming_important_dates`, `ai_reminders` (`{ overdue, upcoming, recently_done }`), `working_note_reminders`, `working_notes`, `things_to_remember`, `recent_moments`, `pinned_people`, `stale_people`, `pinned_lists`, `connection_groups`, `food_log`, `grocery_items`, `home_items`, `meal_plans`. Drill into dedicated endpoints only when you need more than the briefing contains.
 
 ### People
 - `GET /api/agent/people?q=&limit=&offset=` — search by name/email/phone substring.
