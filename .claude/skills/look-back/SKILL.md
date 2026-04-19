@@ -9,9 +9,9 @@ Retrospective review. Snapshot-history-first. Celebrates what closed, surfaces w
 
 ## Fetch + snapshot
 
-Same mechanics as the `briefing` skill — see `.claude/skills/briefing/SKILL.md` for filename format, error handling, and storage location. By default, fetch `GET /api/agent/briefing` and write a snapshot so "now" is captured and future look-backs have one more data point.
+Same mechanics as the `briefing` skill — see `.claude/skills/briefing/SKILL.md` for filename format, error handling, storage location, **and the commit-and-push step**. By default, fetch `GET /api/agent/briefing`, write a snapshot so "now" is captured and future look-backs have one more data point, then commit and push it per the canonical spec.
 
-**Skip the fetch** when the user explicitly asks for a pure-historical view (*"just compare Monday's snapshot to Wednesday's, don't fetch"*). In that case, work only from `public/briefings/`.
+**Skip the fetch** when the user explicitly asks for a pure-historical view (*"just compare Monday's snapshot to Wednesday's, don't fetch"*). In that case, work only from `public/briefings/` and don't write or commit anything.
 
 ## Window selection
 
