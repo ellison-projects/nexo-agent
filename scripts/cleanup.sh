@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Same rationale as restart.sh: when the agent itself triggers cleanup (via
+# Telegram), `pm2 kill` below will take the agent — and this script with it —
+# down before `pm2 start` runs. Detect non-interactive invocation and re-launch
+# in a new session so the start step still happens.
+if [ ! -t 0 ] && [ "${NEXO_CLEANUP_DETACHED:-}" != "1" ]; then
+  LOG=/tmp/nexo-cleanup.log
+  NEXO_CLEANUP_DETACHED=1 setsid -f bash "$0" "$@" </dev/null >"$LOG" 2>&1
+  echo "Cleanup running detached — tail $LOG for progress."
+  exit 0
+fi
+
 cd "$(dirname "$0")/.."
 
 echo "==> Cleanup: resetting Nexo to a clean state"
