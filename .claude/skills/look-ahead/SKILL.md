@@ -9,7 +9,7 @@ Forward-looking review. Decision-first framing: what's time-sensitive, what need
 
 ## Fetch + snapshot
 
-Same mechanics as the `briefing` skill — see `.claude/skills/briefing/SKILL.md` for the full spec (filename format, error handling, `briefings/` is gitignored). Fetch `GET /api/agent/briefing`, write the raw response to `briefings/YYYY-MM-DDTHHMMSSZ.json`. Do not duplicate or re-describe the snapshot mechanics here.
+Same mechanics as the `briefing` skill — see `.claude/skills/briefing/SKILL.md` for the full spec (filename format, error handling, storage in `public/briefings/`). Fetch `GET /api/agent/briefing`, write the raw response to `public/briefings/YYYY-MM-DDTHHMMSSZ.json`. Do not duplicate or re-describe the snapshot mechanics here.
 
 Every look-ahead fetches fresh — the point is a current read on what's coming.
 

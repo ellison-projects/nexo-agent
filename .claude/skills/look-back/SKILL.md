@@ -1,6 +1,6 @@
 ---
 name: look-back
-description: Use when Matt wants a retrospective briefing — what closed, what got done, what drifted. Draws primarily on the local `briefings/` snapshot history to diff the past against now. Useful for end-of-day wrap-ups, reflection, and weekly reviews. Triggers: "look back", "review my day/week", "how did this week go", "what did I finish", "what did I get done since Monday", "end-of-day brief", "evening briefing", "wrap up my week", "compare to yesterday's briefing".
+description: Use when Matt wants a retrospective briefing — what closed, what got done, what drifted. Draws primarily on the local `public/briefings/` snapshot history to diff the past against now. Useful for end-of-day wrap-ups, reflection, and weekly reviews. Triggers: "look back", "review my day/week", "how did this week go", "what did I finish", "what did I get done since Monday", "end-of-day brief", "evening briefing", "wrap up my week", "compare to yesterday's briefing".
 ---
 
 # Look-back briefing
@@ -9,9 +9,9 @@ Retrospective review. Snapshot-history-first. Celebrates what closed, surfaces w
 
 ## Fetch + snapshot
 
-Same mechanics as the `briefing` skill — see `.claude/skills/briefing/SKILL.md` for filename format, error handling, and gitignore. By default, fetch `GET /api/agent/briefing` and write a snapshot so "now" is captured and future look-backs have one more data point.
+Same mechanics as the `briefing` skill — see `.claude/skills/briefing/SKILL.md` for filename format, error handling, and storage location. By default, fetch `GET /api/agent/briefing` and write a snapshot so "now" is captured and future look-backs have one more data point.
 
-**Skip the fetch** when the user explicitly asks for a pure-historical view (*"just compare Monday's snapshot to Wednesday's, don't fetch"*). In that case, work only from `briefings/`.
+**Skip the fetch** when the user explicitly asks for a pure-historical view (*"just compare Monday's snapshot to Wednesday's, don't fetch"*). In that case, work only from `public/briefings/`.
 
 ## Window selection
 

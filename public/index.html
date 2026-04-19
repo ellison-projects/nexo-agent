@@ -3,17 +3,239 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Nexo</title>
+    <title>Nexo Snapshots</title>
     <style>
-      html, body { margin: 0; padding: 0; font-family: system-ui, sans-serif; background: #111; color: #eee; }
-      main { max-width: 40rem; margin: 4rem auto; padding: 0 1.5rem; line-height: 1.5; }
-      h1 { font-weight: 500; }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        background: #0a0a0a;
+        color: #e8e8e8;
+        line-height: 1.5;
+      }
+      main {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 2rem 1.5rem;
+      }
+      header {
+        margin-bottom: 3rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid #222;
+      }
+      h1 {
+        font-size: 2rem;
+        font-weight: 600;
+        margin: 0 0 0.5rem 0;
+        letter-spacing: -0.02em;
+      }
+      .subtitle {
+        color: #888;
+        font-size: 0.95rem;
+      }
+      .filter-tabs {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 2rem;
+        padding: 0.5rem;
+        background: #151515;
+        border-radius: 8px;
+      }
+      .filter-tab {
+        padding: 0.5rem 1rem;
+        background: none;
+        border: none;
+        color: #888;
+        cursor: pointer;
+        font-size: 0.9rem;
+        border-radius: 6px;
+        transition: all 0.2s;
+      }
+      .filter-tab:hover {
+        color: #fff;
+        background: #1f1f1f;
+      }
+      .filter-tab.active {
+        color: #5bf;
+        background: #1a2530;
+      }
+      .snapshot-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      .snapshot-item {
+        margin: 0;
+        padding: 1rem 1.25rem;
+        background: #151515;
+        border: 1px solid #222;
+        border-radius: 8px;
+        transition: all 0.2s;
+      }
+      .snapshot-item + .snapshot-item {
+        margin-top: 0.75rem;
+      }
+      .snapshot-item:hover {
+        background: #1a1a1a;
+        border-color: #333;
+        transform: translateX(2px);
+      }
+      .snapshot-item a {
+        color: #fff;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+      .snapshot-name {
+        flex: 1;
+        font-size: 0.95rem;
+        font-weight: 500;
+      }
+      .snapshot-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-size: 0.85rem;
+      }
+      .badge {
+        padding: 0.25rem 0.5rem;
+        background: #2a1f0a;
+        color: #fb5;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+      }
+      .badge.briefing {
+        background: #0a1f2a;
+        color: #5bf;
+      }
+      .badge.llm {
+        background: #1f0a2a;
+        color: #d5f;
+      }
+      .badge.features {
+        background: #0a2a1f;
+        color: #5fd;
+      }
+      .date {
+        color: #666;
+        font-size: 0.85rem;
+        font-variant-numeric: tabular-nums;
+      }
+      .empty {
+        color: #555;
+        font-style: italic;
+        text-align: center;
+        padding: 3rem 1rem;
+      }
+      @media (max-width: 600px) {
+        main { padding: 1.5rem 1rem; }
+        h1 { font-size: 1.5rem; }
+        .snapshot-item a {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .snapshot-meta {
+          width: 100%;
+        }
+      }
     </style>
   </head>
   <body>
     <main>
-      <h1>Nexo</h1>
-      <p>Nothing to share yet.</p>
+      <header>
+        <h1>Nexo Snapshots</h1>
+        <div class="subtitle">Briefings and API snapshots</div>
+      </header>
+
+      <div class="filter-tabs">
+        <button class="filter-tab active" data-filter="all">All</button>
+        <button class="filter-tab" data-filter="briefing">Briefings</button>
+        <button class="filter-tab" data-filter="llm">LLM</button>
+        <button class="filter-tab" data-filter="features">Features</button>
+        <button class="filter-tab" data-filter="api">Other</button>
+      </div>
+
+      <ul class="snapshot-list" id="snapshots">
+        <li class="empty">Loading...</li>
+      </ul>
     </main>
+    <script>
+      let allSnapshots = [];
+      let activeFilter = 'all';
+
+      async function loadSnapshots() {
+        try {
+          const response = await fetch('/api/snapshots');
+          if (!response.ok) {
+            document.getElementById('snapshots').innerHTML =
+              '<li class="empty">No snapshots available yet.</li>';
+            return;
+          }
+          allSnapshots = await response.json();
+          renderSnapshots();
+        } catch (e) {
+          console.log('Could not load snapshots:', e);
+          document.getElementById('snapshots').innerHTML =
+            '<li class="empty">Failed to load snapshots.</li>';
+        }
+      }
+
+      function renderSnapshots() {
+        const list = document.getElementById('snapshots');
+
+        if (allSnapshots.length === 0) {
+          list.innerHTML = '<li class="empty">No snapshots yet. Run a briefing or check API endpoints.</li>';
+          return;
+        }
+
+        const filtered = activeFilter === 'all'
+          ? allSnapshots
+          : allSnapshots.filter(s => s.type === activeFilter);
+
+        if (filtered.length === 0) {
+          list.innerHTML = `<li class="empty">No ${activeFilter} snapshots yet.</li>`;
+          return;
+        }
+
+        list.innerHTML = filtered.map(s => {
+          const badgeMap = {
+            'briefing': { class: 'badge briefing', text: 'Briefing' },
+            'llm': { class: 'badge llm', text: 'LLM' },
+            'features': { class: 'badge features', text: 'Features' },
+            'api': { class: 'badge', text: 'API' }
+          };
+          const badge = badgeMap[s.type] || badgeMap.api;
+          return `
+            <li class="snapshot-item">
+              <a href="${s.url}">
+                <span class="snapshot-name">${s.name}</span>
+                <span class="snapshot-meta">
+                  <span class="${badge.class}">${badge.text}</span>
+                  <span class="date">${s.date}</span>
+                </span>
+              </a>
+            </li>
+          `;
+        }).join('');
+      }
+
+      // Filter tabs
+      document.querySelectorAll('.filter-tab').forEach(tab => {
+        tab.addEventListener('click', (e) => {
+          document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+          e.target.classList.add('active');
+          activeFilter = e.target.dataset.filter;
+          renderSnapshots();
+        });
+      });
+
+      loadSnapshots();
+    </script>
   </body>
 </html>

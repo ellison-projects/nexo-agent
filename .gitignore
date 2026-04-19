@@ -2,3 +2,5 @@ node_modules
 .session-id
 bot.log
 briefings/
+public/briefings/
+public/api-snapshots/

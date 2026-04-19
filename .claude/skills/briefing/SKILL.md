@@ -11,27 +11,27 @@ This file also holds the canonical snapshot-mechanics spec (storage, filename, e
 
 ## Snapshot storage
 
-- Location: `briefings/` at the repo root (working dir). Gitignored — personal data.
+- Location: `public/briefings/` at the repo root (working dir). Stored in public so they're web-accessible via the nexo-web server.
 - Filename: `YYYY-MM-DDTHHMMSSZ.json` in UTC. Alphabetically sortable. Example: `2026-04-18T143045Z.json`.
 - Content: the raw JSON body from `GET /api/agent/briefing`. No wrapping, no transformation.
-- Create `briefings/` if it doesn't exist.
+- Create `public/briefings/` if it doesn't exist.
 
 ## Fresh briefing flow
 
 **Step 1. Fetch and snapshot in one shot.**
 
 ```bash
-mkdir -p briefings
+mkdir -p public/briefings
 ts=$(date -u +%Y-%m-%dT%H%M%SZ)
 curl -s "https://app.nexoprm.com/api/agent/briefing" \
   -H "Authorization: Bearer $NEXO_API_KEY" \
   -H "X-Nexo-User: $NEXO_USER" \
-  -o "briefings/$ts.json"
+  -o "public/briefings/$ts.json"
 ```
 
 Verify the file is valid JSON and non-empty before proceeding. If the API errored, the file will contain `{"error":...,"code":...}` — surface that to the user and stop; don't keep a broken snapshot around (delete it).
 
-**Step 2. Find the prior snapshot.** List `briefings/` sorted; the prior snapshot is the second-to-latest entry (the latest is the one you just wrote). If none exists, this is the first briefing — skip the diff and just present a summary of what's currently open.
+**Step 2. Find the prior snapshot.** List `public/briefings/` sorted; the prior snapshot is the second-to-latest entry (the latest is the one you just wrote). If none exists, this is the first briefing — skip the diff and just present a summary of what's currently open.
 
 **Step 3. Diff.** Compare by `id` within these fields (the briefing only shows *open* items, so an id disappearing means completed or dismissed):
 
