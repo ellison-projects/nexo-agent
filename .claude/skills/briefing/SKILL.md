@@ -11,10 +11,22 @@ This file also holds the canonical snapshot-mechanics spec (storage, filename, e
 
 ## Snapshot storage
 
-- Location: `public/briefings/` at the repo root (working dir). Stored in public so they're web-accessible via the nexo-web server.
+- Location: `public/briefings/` at the repo root (working dir). Stored in public so they're web-accessible via the nexo-web server. Tracked in git so snapshot history is durable across machines.
 - Filename: `YYYY-MM-DDTHHMMSSZ.json` in UTC. Alphabetically sortable. Example: `2026-04-18T143045Z.json`.
 - Content: the raw JSON body from `GET /api/agent/briefing`. No wrapping, no transformation.
 - Create `public/briefings/` if it doesn't exist.
+
+## Commit and push (canonical — siblings reference this)
+
+After writing a valid snapshot (and never if the fetch errored / file was deleted), commit and push it so the snapshot history stays durable across machines:
+
+```bash
+git add public/briefings/<filename>.json
+git commit -m "briefing: snapshot <timestamp>"
+git push -u origin <current-branch>
+```
+
+Retry push up to 4 times with exponential backoff (2s, 4s, 8s, 16s) on network failure. Never force-push. Don't include the snapshot in the same commit as unrelated changes.
 
 ## Fresh briefing flow
 
