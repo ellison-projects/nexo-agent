@@ -23,6 +23,7 @@ The agent currently has:
   - **`look-back`** (`.claude/skills/look-back/`) — retrospective. Diffs snapshot history to show what closed / drifted / stuck. Triggers: "review my week", "what did I finish", "evening briefing".
   - For a lightweight todos-only rollup without snapshotting, the `nexo-prm` skill's "debrief" flow is the right call.
 - **Briefing endpoint** (`GET /api/agent/briefing`) — a one-call read-only roll-up of my open todos, plan items, reminders, recent moments, pinned people, etc. Used by the briefing-family skills. Not pre-fetched — the agent decides when to call it.
+- **`remember` skill** (`.claude/skills/remember/`) — turns casual "remember X" requests into durable notes committed into the repo. Routes facts to the right file under `docs/` (project docs, `docs/matt/*`, or `CLAUDE.md`), confirms wording and destination, then commits and pushes. For facts about a person already in PRM, it defers to `nexo-prm` instead.
 - **Standard Claude Code tools** — Read/Glob/Grep/Bash/etc. via the `claude_code` preset. Available for any task that calls for them — codebase work, shell commands, research, etc.
 
 Additional skills will likely land here over time (calendar, email, etc.). When they do, list them in this section.
