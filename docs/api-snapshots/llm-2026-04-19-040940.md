@@ -1,0 +1,666 @@
+# NexoPRM Agent API — LLM Reference
+
+This file is the single-URL bootstrap for any AI agent or script that needs to
+read or write NexoPRM data on behalf of a user. Fetch it at
+`https://app.nexoprm.com/agentapi/llm.md` and keep it in context.
+
+NexoPRM is a Personal Responsibility Manager built around four pillars: family,
+relationships, health, and ambitions. The agent API lets a trusted external
+agent touch every one of those areas for any user in the system.
+
+**How to use this doc:**
+
+- Optimized for deciding *when* and *why* to call each endpoint — not for memorizing every field.
+- Need an exact request/response shape? Send the call with `X-Nexo-Dry-Run: true` — it validates input and returns the would-be payload without persisting.
+- Or fetch the full OpenAPI 3.1 spec: `https://app.nexoprm.com/agentapi/openapi.yaml`
+
+## Base URL
+
+```
+https://app.nexoprm.com
+```
+
+All agent endpoints live under `/api/agent/`.
+
+## Authentication
+
+Every request MUST include two headers (unless noted otherwise on a specific
+endpoint).
+
+| Header | Value |
+|---|---|
+| `Authorization` | `Bearer <AGENT_API_KEY>` |
+| `X-Nexo-User` | Target user's email OR numeric id |
+
+`AGENT_API_KEY` is a single static shared secret. It grants god-mode across all
+users. `X-Nexo-User` picks which user's data the current request touches — the
+scoping rule inside every SQL query is `WHERE user_id = <impersonated_user>`,
+so a request only ever sees that one user's rows.
+
+### Optional headers
+
+| Header | Effect |
+|---|---|
+| `X-Nexo-Dry-Run: true` | On write endpoints: validate input and return the would-be payload, but do not persist. Audit log entry is still written as a `read`. |
+| `Idempotency-Key` | Reserved for future use. Currently accepted and ignored. |
+
+### Endpoints that do NOT require `X-Nexo-User`
+
+- `GET /api/agent/me` — optional header
+- `GET /api/agent/users` — header is ignored
+- `GET /api/agent/audit-log` — header is ignored
+
+### Error shape
+
+All errors return:
+
+```json
+{ "error": "human-readable message", "code": "error_code" }
+```
+
+Error codes: `unauthorized`, `forbidden`, `not_found`, `validation_error`,
+`conflict`, `internal_error`, `missing_user_header`, `unknown_user`,
+`service_unavailable`.
+
+### Destructive operations
+
+Every `DELETE` endpoint requires `?confirm=true` in the query string. Missing
+the flag returns `400 validation_error`. This is a deliberate guardrail
+against a hallucinated tool call wiping data.
+
+### Identifiers
+
+- IDs in responses are strings (bigints serialized as text to avoid JS precision loss).
+- Timestamps are ISO 8601 UTC.
+- Field names in request bodies match the DB column names exactly (e.g.
+  `person_id`, `important_dates`, `pinned_at`) — NOT the camelCased shapes used
+  by the web UI.
+
+## Example prompts → API calls
+
+This section maps real user utterances to the exact API calls an agent
+should make. These are the shapes you'll hit 80% of the time — skim them
+before diving into the full reference below.
+
+### "What's on my plate?" / "Catch me up" / "Give me a briefing"
+
+Any "situational awareness" prompt — a morning check-in, an assistant trying to proactively help, a user asking what they're forgetting — should hit the one-call briefing first.
+
+```
+GET /api/agent/briefing
+```
+
+No parameters. See the "Briefing" section below for the full response shape.
+
+Use this BEFORE firing a bunch of individual `GET` calls when the user opens with an open-ended prompt. After the briefing, drill into specific resources only if the briefing didn't already contain the answer.
+
+### "Add a note for Sarah — she mentioned her dad's in the hospital"
+
+Two calls: find the person, then log a moment.
+
+```
+GET  /api/agent/people?q=sarah&limit=10
+  → pick the right id from the response
+
+POST /api/agent/moments
+{
+  "person_id": "<sarah_id>",
+  "content": "Sarah mentioned her dad is in the hospital."
+}
+```
+
+The moment is persisted and the AI reminder pipeline runs in the
+background. Do NOT also call `things-to-remember` — moments already cover
+timestamped observations.
+
+If the user says "remember that Sarah prefers texts" (a durable fact, not
+a timestamped event), use `POST /api/agent/things-to-remember` instead.
+
+### "Sam likes pineapple pizza" (ambiguous name — disambiguate first)
+
+When the user mentions a person by a first name or nickname, always search
+first and handle the match count explicitly. **Never guess a person id.**
+
+```
+GET /api/agent/people?q=sam&limit=10
+```
+
+Then branch on the result:
+
+**0 matches** → ask the user whether to create a new person. If yes:
+
+```
+POST /api/agent/people  { "name": "Sam" }
+POST /api/agent/moments { "person_id": "<new_id>", "content": "Sam likes pineapple pizza." }
+```
+
+**Exactly 1 match** → proceed without asking. Go straight to
+`POST /api/agent/moments` with that id.
+
+**2 or more matches** → ask the user which one. Present the candidates
+with enough context to distinguish them. Use the fields already returned
+by the search response: `name`, and whichever of `email`, `phone`, or
+relationship/context is set. Example prompt back to the user:
+
+> I found multiple Sams — which one?
+> 1. Sam Chen (sam.chen@example.com)
+> 2. Sam Johnson (555-0199)
+> 3. Sam Rodriguez (kids' soccer coach)
+
+Wait for the user's pick before writing. Once they answer:
+
+```
+POST /api/agent/moments
+{
+  "person_id": "<picked_id>",
+  "content": "Sam likes pineapple pizza."
+}
+```
+
+This same pattern applies to ANY write that needs a person: moments,
+things-to-remember, linked-people, list membership, etc. Search → count
+match → disambiguate if needed → write.
+
+### "Add milk to my groceries"
+
+One call, using the `active` shortcut:
+
+```
+POST /api/agent/groceries/lists/active/items
+{ "name": "milk" }
+```
+
+If there is no active list yet, that call returns `404 not_found`. Recover
+with:
+
+```
+POST /api/agent/groceries/lists            (creates a new active list)
+POST /api/agent/groceries/lists/active/items { "name": "milk" }
+```
+
+Multiple items at once → one POST per item. No bulk endpoint today.
+
+### "Add 'fix the leaky faucet' to my home list"
+
+One call — there's one implicit home list per user, so no parent id needed:
+
+```
+POST /api/agent/home-items
+{ "title": "Fix the leaky faucet" }
+```
+
+With a dated reminder (surfaces in the calendar feed and in the briefing's `today`/`upcoming` buckets):
+
+```
+POST /api/agent/home-items
+{
+  "title": "Swap out furnace filter",
+  "scheduled_on": "2026-05-01",
+  "schedule_note": "new one is in the garage"
+}
+```
+
+To tack on context later (model number, receipt details, etc.):
+
+```
+POST /api/agent/home-items/<id>/notes
+{ "content": "Replacement cartridge: Moen 1224" }
+```
+
+Mark it done:
+
+```
+PATCH /api/agent/home-items/<id>
+{ "done_at": "2026-04-18T15:00:00Z" }
+```
+
+### "Add 'call the plumber' to my plan"
+
+One call, using the `latest` shortcut:
+
+```
+POST /api/agent/working-notes/latest/items
+{ "content": "Call the plumber" }
+```
+
+Same 404-then-create-then-retry pattern if the user has no working notes
+yet (POST `/api/agent/working-notes` first).
+
+### "I just thought of something I need to do"
+
+Random ad-hoc todos belong in the user's current plan as a top-level item
+(no heading, no parent). All of these utterances map to the same call:
+
+- "I need to call the dentist"
+- "Remind me to renew the registration"
+- "Todo: pick up dry cleaning"
+- "Don't let me forget to email Jim"
+- "Add this to my todo list: …"
+- "Jot down that I should …"
+
+```
+POST /api/agent/working-notes/latest/items
+{ "content": "<the thing to do>" }
+```
+
+Do NOT create a new working note per random todo, and do NOT try to slot
+it under an existing heading unless the user explicitly mentions the
+project. Leaving `parent_id` null is the right default.
+
+### "I did the thing — check it off"
+
+Two steps: find the item, then flip its `checked`.
+
+```
+GET   /api/agent/working-notes/latest
+  → scan `items` for a content match
+
+PATCH /api/agent/working-note-items/<itemId>
+{ "checked": true }
+```
+
+Grocery items work the same way with `PATCH /api/agent/groceries/items/<itemId>`.
+
+### "When is my mom's birthday?"
+
+No write, just a lookup:
+
+```
+GET /api/agent/people?q=mom
+GET /api/agent/people/<id>
+  → read person.important_dates for the Birthday entry
+```
+
+### "Log that the kids had pasta for dinner"
+
+```
+POST /api/agent/food-log
+{
+  "person_name": "Kids",
+  "description": "Pasta with marinara",
+  "logged_at": "2026-04-17T18:30:00Z"
+}
+```
+
+### "Show me what's overdue on my plan"
+
+```
+GET /api/agent/working-notes/latest
+  → filter items where checked = false
+```
+
+### "Remind me to check in with Sarah next week"
+
+Reminders are AI-generated from moments, not manually created. The right
+move is to log a moment describing what's going on, and the existing AI
+pipeline will produce a follow-up reminder:
+
+```
+POST /api/agent/moments
+{ "person_id": "<sarah_id>", "content": "Want to check in with Sarah about her dad next week." }
+```
+
+Then the user can see it via `GET /api/agent/ai-reminders?personId=<id>&status=new`.
+
+### "Mark all done reminders for today as handled"
+
+```
+GET   /api/agent/ai-reminders?status=new&dueBefore=<tomorrow_iso>
+PATCH /api/agent/ai-reminders/<id>  { "status": "done" }   // per id
+```
+
+### Defaults to assume
+
+- If the user says "my" / "me" without specifying a user, use the
+  impersonated user (the `X-Nexo-User` header is already set by the
+  caller).
+- "Now" means "omit `created_at`/`logged_at`" — the server defaults to NOW.
+- "My current <plan|groceries>" = `/latest` or `/active` shortcuts.
+- Never DELETE as a best-guess response to an ambiguous prompt. Use
+  dry-run (`X-Nexo-Dry-Run: true`) if you're unsure.
+
+## Smoke test
+
+```bash
+curl -s https://app.nexoprm.com/api/agent/me \
+  -H "Authorization: Bearer $AGENT_API_KEY" \
+  -H "X-Nexo-User: matthewcellison@gmail.com"
+```
+
+Expected 200:
+
+```json
+{
+  "key": "primary",
+  "user": { "id": 1, "email": "matthewcellison@gmail.com", "name": "..." }
+}
+```
+
+## Resources at a glance
+
+| Resource | Purpose |
+|---|---|
+| `users` | List all users in the system (admin-level). |
+| `people` | Individual contacts (family, friends, etc.). |
+| `moments` | Timestamped notes about a person or relationship. Creating one triggers AI reminder analysis. |
+| `things-to-remember` | Key facts to remember about a person or relationship. |
+| `ai-reminders` | AI-generated follow-up reminders tied to moments. Status-only updates. |
+| `relationships` | Named relationship containers (couple, family, group) with member join table. |
+| `lists` | Simple lists for organizing people. |
+| `connection-groups` | Named groups of people with shared context (e.g. "Kids' parents"). |
+| `linked-people` | Directed edges between two people (e.g. "spouse of"). |
+| `working-notes` | On-demand plan dumps with items and headings. |
+| `areas-of-focus` | Ongoing life themes (3–5 at a time). |
+| `meals` | Saved meal ideas. |
+| `food-log` | Calorie/food entries for the user and their household. |
+| `groceries` | Grocery lists and items. One list per user is "active" at a time. |
+| `home-items` | Home maintenance/chore items with free-text notes. One implicit list per user. |
+| `audit-log` | The agent's own audit trail. Read-only. |
+| `briefing` | One-call situational-awareness payload for the next 14 days and what was finished in the last 7 days. Read-only. |
+| `features` | Living product features summary (markdown). Read-only. |
+
+## Conventions for list endpoints
+
+Every list endpoint accepts:
+
+- `limit` (default 50, max 200)
+- `offset` (default 0)
+
+Some accept resource-specific filters documented below.
+
+## Endpoint reference
+
+A compact map of the surface. Shapes (request bodies, writable fields, response keys) are not documented here — send a call with `X-Nexo-Dry-Run: true` to see the expected payload, or fetch the OpenAPI spec at `https://app.nexoprm.com/agentapi/openapi.yaml`. All `DELETE`s require `?confirm=true`.
+
+### Auth / meta
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/agent/me` | Resolve the impersonated user; auth smoke test. |
+| GET | `/api/agent/users` | List every user in the system. No impersonation header required. |
+
+### People
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/agent/people?q=` | Search by name / email / phone. |
+| POST | `/api/agent/people` | Create a person. |
+| GET | `/api/agent/people/{id}` | Full detail — person + moments + things_to_remember + linked_people + lists + connection_groups + ai_summary. |
+| PATCH | `/api/agent/people/{id}` | Partial update. |
+| DELETE | `/api/agent/people/{id}` | Cascades to moments, reminders, things-to-remember. |
+
+### Moments
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/agent/moments?personId=&relationshipId=&since=&until=` | List filtered moments. |
+| POST | `/api/agent/moments` | Create. Background AI reminder analysis runs via the analyze-content cron. |
+| GET | `/api/agent/moments/{id}` | Detail with images + related AI reminders. |
+| PATCH | `/api/agent/moments/{id}` | Only `content` is mutable. |
+| DELETE | `/api/agent/moments/{id}` | |
+
+### Things to remember
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/agent/things-to-remember?personId=&relationshipId=` | List. |
+| POST | `/api/agent/things-to-remember` | Create (one of `person_id` / `relationship_id`). |
+| GET/PATCH/DELETE | `/api/agent/things-to-remember/{id}` | CRUD by id. |
+
+### AI reminders
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/agent/ai-reminders?personId=&status=&dueBefore=` | List. `status` ∈ `new` / `done` / `dismissed`. |
+| GET | `/api/agent/ai-reminders/{id}` | Detail. |
+| PATCH | `/api/agent/ai-reminders/{id}` | Only `status` is mutable. |
+
+### Relationships
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET/POST | `/api/agent/relationships` | List / create. |
+| GET/PATCH/DELETE | `/api/agent/relationships/{id}` | Detail (includes members + things_to_remember) / update / delete. |
+| POST | `/api/agent/relationships/{id}/members` | Add a person. |
+| DELETE | `/api/agent/relationships/{id}/members/{personId}` | Remove a person. |
+
+### Lists
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET/POST | `/api/agent/lists` | List / create. |
+| GET/PATCH/DELETE | `/api/agent/lists/{id}` | Detail (includes members) / update / delete. |
+| POST | `/api/agent/lists/{id}/members` | Add a person. |
+| DELETE | `/api/agent/lists/{id}/members/{personId}` | Remove a person. |
+
+### Connection groups
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET/POST | `/api/agent/connection-groups` | List / create. |
+| GET/PATCH/DELETE | `/api/agent/connection-groups/{id}` | Detail (includes members) / update / delete. |
+| POST | `/api/agent/connection-groups/{id}/members` | Add a person (supports `order`). |
+| DELETE | `/api/agent/connection-groups/{id}/members/{personId}` | Remove a person. |
+
+### Linked people
+
+One-way edges between two people (e.g. "spouse of", "kid's friend"). Both people must belong to the impersonated user.
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/agent/linked-people?personId=` | List edges for a person. |
+| POST | `/api/agent/linked-people` | Create edge. |
+| PATCH/DELETE | `/api/agent/linked-people/{id}` | Update description / delete. |
+
+### Working notes
+
+On-demand plan dumps with items (headings + checkboxes, one level of nesting max). Pass the literal string `latest` instead of a numeric id to target the user's most recent working note — the intended way to "add a todo to my current plan" without listing first. Returns 404 if no notes exist yet.
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET/POST | `/api/agent/working-notes` | List / create. |
+| GET/PATCH/DELETE | `/api/agent/working-notes/{id\|latest}` | Detail (with items) / update / delete. |
+| POST | `/api/agent/working-notes/{id\|latest}/items` | Append an item or heading. |
+| PATCH/DELETE | `/api/agent/working-note-items/{itemId}` | Update (commonly `checked: true`) or delete. |
+
+### Areas of focus
+
+Ongoing life themes. These are the user's goals.
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET/POST | `/api/agent/areas-of-focus` | List / create. |
+| GET/PATCH/DELETE | `/api/agent/areas-of-focus/{id}` | CRUD. |
+
+### Meals
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET/POST | `/api/agent/meals` | List / create saved meal ideas. |
+| GET/PATCH/DELETE | `/api/agent/meals/{id}` | CRUD. |
+
+### Food log
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/agent/food-log?personName=&since=&until=` | List. |
+| POST | `/api/agent/food-log` | Create (only `description` required; `logged_at` defaults to NOW). |
+| PATCH/DELETE | `/api/agent/food-log/{id}` | Update / delete. |
+
+### Groceries
+
+At most one **active** list per user at any time. `POST /groceries/lists` retires the old active list automatically. `{id}` accepts the literal `active` to target the current list.
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET/POST | `/api/agent/groceries/lists` | List (with `item_count` + `unchecked_count`) / update / delete. |
+| GET/PATCH/DELETE | `/api/agent/groceries/lists/{id\|active}` | Detail (includes items) / update / delete. |
+| POST | `/api/agent/groceries/lists/{id\|active}/items` | Add item. |
+| PATCH/DELETE | `/api/agent/groceries/items/{itemId}` | Update (commonly `checked: true`) or delete. |
+
+### Home items
+
+One implicit home list per user (no parent id needed). Open items (`done_at IS NULL`) are returned by default; pass `?done=true` to include completed. Items carry free-text notes as a sub-resource.
+
+Open items can optionally carry a dated reminder: `scheduled_on` (`YYYY-MM-DD`) and a short `schedule_note`. Both are accepted on `POST /api/agent/home-items` and `PATCH /api/agent/home-items/{id}` — pass `null` (or `""`) to clear. Scheduled items surface in the user's calendar feed as an all-day event with a morning-of alarm; completing an item (`done_at` set) drops it from the feed.
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET/POST | `/api/agent/home-items` | List (with `note_count`, `scheduled_on`, `schedule_note`) / create. |
+| GET/PATCH/DELETE | `/api/agent/home-items/{id}` | Detail (with notes) / update (`title`, `done_at`, `scheduled_on`, `schedule_note`) / delete. |
+| POST | `/api/agent/home-items/{id}/notes` | Append a note. |
+| PATCH/DELETE | `/api/agent/home-item-notes/{noteId}` | Update / delete a note. |
+
+### Briefing
+
+One-call situational-awareness payload covering the next 14 days looking forward and the last 7 days looking backward for "what did I finish recently?". Read-only, no parameters.
+
+#### `GET /api/agent/briefing`
+
+**When to call it:** any time the user's prompt is open-ended and you need a grounded picture of their life before responding. Cheaper and less hallucination-prone than firing a bunch of individual reads.
+
+Typical triggers:
+
+- *"Catch me up"* / *"Give me a morning briefing"* / *"What's on my plate this week?"*
+- *"What did I get done this week?"* / *"Summarize what I've finished recently"* — the briefing is designed to answer this in one call; don't piece it together from individual resource reads.
+- *"Am I forgetting anyone / anything?"*
+- *"What's going on with the house / groceries / meals this week?"*
+- You're about to suggest something proactive and want to make sure it doesn't conflict with what's already on the user's plate.
+
+**What's inside:**
+
+- **Framing** — the four app pillars, the user's goals, and their trigger-list keywords
+- **Upcoming important dates** — next 14 days (birthdays, anniversaries, etc.)
+- **AI reminders** — `overdue`, `upcoming`, and `recently_done` (last 7 days)
+- **Working-note reminders** — `upcoming` (coming due in the next 14 days) and `recently_done` (fired/dismissed in the last 7 days)
+- **Working notes** — every note's full contents (items checked + unchecked with `checked_at` timestamps, per-item reminder info, and the note's `priorities_text`)
+- **Recently completed working-note items** — flat list of items checked off in the last 7 days with parent-heading context (`content`, `parent_content`, `checked_at`, `note_id`) so you can say "you finished X under project Y on Tuesday"
+- **Things-to-remember** — durable facts about people or relationships
+- **Recent moments** — last 7 days
+- **Pinned people** — each with their most recent moment
+- **Stale people** — not touched in 30+ days
+- **Pinned lists** — with member counts
+- **Connection groups** — all groups with their `things_to_remember` and important dates
+- **Food log** — last 7 days
+- **Groceries** — `active` (unchecked on the active list) and `recently_done` (checked off in the last 7 days, with `checked_at`)
+- **Home items** — open items bucketed by schedule state (`overdue` / `today` / `upcoming` / `unscheduled`), plus `recently_done` (last 7 days)
+- **Meal plans** — next 14 days
+
+**How to summarize "what I got done":** collect everything with a `*_at` completion timestamp in the last 7 days — `ai_reminders.recently_done[].updated_at`, `working_note_reminders.recently_done[].updated_at`, `recently_done_working_note_items[].checked_at`, `grocery_items.recently_done[].checked_at`, and `home_items.recently_done[].done_at` — then group by day for a human-readable rundown.
+
+Drill into the dedicated resource endpoints whenever you need more than the briefing contains — full person history, older moments, completed items, etc. The briefing is the opening read, not the only one.
+
+### Features
+
+A short, human-written summary of every user-facing feature in NexoPRM grouped by pillar. Call this when you need to ground on what the app actually does (which features exist, what each is for) before deciding which resource endpoints to touch.
+
+#### `GET /api/agent/features`
+
+No parameters. `X-Nexo-User` is optional.
+
+Response:
+
+```json
+{
+  "content": "# NexoPRM — Product Features\n\n...",
+  "updated_at": "2026-04-18T10:00:00Z"
+}
+```
+
+`content` is raw markdown. Keep it in context when answering "what can this app do?" / "is there a way to track X?" kinds of questions, or before proposing a new feature.
+
+### Audit log
+
+Read-only view of the agent's own request history. Every `/api/agent/*` call
+(including auth failures) writes exactly one row. Bodies are stored as a
+SHA-256 digest, not raw payloads.
+
+#### `GET /api/agent/audit-log?userId=&since=&action=&resourceType=&limit=&offset=`
+
+Response:
+
+```json
+{
+  "entries": [
+    {
+      "id": "501",
+      "acted_for_user_id": "1",
+      "method": "POST",
+      "path": "/api/agent/moments",
+      "status_code": 201,
+      "resource_type": "moment",
+      "resource_id": "812",
+      "action": "create",
+      "request_body_digest": "a3f1...",
+      "ip": "1.2.3.4",
+      "user_agent": "claude-agent/1.0",
+      "error": null,
+      "created_at": "2026-04-17T14:30:02Z"
+    }
+  ]
+}
+```
+
+## Common agent patterns
+
+### Get a one-call briefing ("catch me up", "what's on my plate")
+
+1. `GET /api/agent/briefing` → read everything in one shot.
+2. If the user's question is answered by something in the response, answer
+   from that data — do not fire more reads.
+3. If you still need detail (e.g. full moment history for one person), only
+   then drill into the dedicated list endpoints.
+
+### Look up and log a moment
+
+1. `GET /api/agent/people?q=sarah` → pick the right id.
+2. `POST /api/agent/moments` with `{ person_id, content }`.
+3. The AI reminder pipeline runs in the background. Check
+   `GET /api/agent/ai-reminders?personId=<id>&status=new` later to see results.
+
+### Quick fact lookup ("when is Sarah's birthday?")
+
+1. `GET /api/agent/people?q=sarah` → get id.
+2. `GET /api/agent/people/{id}` → `person.important_dates` contains the answer.
+
+### Mark a reminder handled
+
+1. `GET /api/agent/ai-reminders?status=new` → find the one that's done.
+2. `PATCH /api/agent/ai-reminders/{id}` with `{ "status": "done" }`.
+
+### Add a thing to remember
+
+1. Resolve the person.
+2. `POST /api/agent/things-to-remember` with `{ person_id, content }`.
+
+### Add an item to "my current plan"
+
+1. `POST /api/agent/working-notes/latest/items` with `{ "content": "..." }`.
+2. If the response is `404 not_found`, the user has no working notes yet —
+   create one with `POST /api/agent/working-notes`, then retry the item
+   POST against the new id.
+
+### Check something off the plan
+
+1. `GET /api/agent/working-notes/latest` → find the item by content match.
+2. `PATCH /api/agent/working-note-items/{itemId}` with `{ "checked": true }`.
+
+## Safety notes for agents
+
+- The bearer token is god-mode. Do not log it. Do not echo it back in
+  responses to the human.
+- Every write is audited — if you are unsure whether to proceed, prefer a
+  dry run with `X-Nexo-Dry-Run: true`.
+- Do not call `DELETE` endpoints without clear user intent. Always include
+  `?confirm=true` explicitly in the URL — the server rejects the call
+  otherwise.
+- Prefer `PATCH` over recreating a record. Most updates are idempotent.
+- Request bodies use DB column names (snake_case), not the camelCase shapes
+  you may have seen in web UI traffic.
+
+## Related files
+
+- `https://app.nexoprm.com/agentapi/openapi.yaml` — full OpenAPI 3.1 spec (publicly fetchable)
+- `docs/plans/ai-agent-api/technical/CLAUDE_TOOL_USE_EXAMPLE.md` — Anthropic
+  SDK tool-use skeleton
+- `docs/features/ai-agent-api/INTEGRATION.md` — human-oriented integration guide
