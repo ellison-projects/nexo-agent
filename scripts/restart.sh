@@ -15,5 +15,3 @@ pkill -f 'tsx.*src/web/server.ts' || true
 # Fresh start — apps were deleted above, so this is a clean register + boot.
 pm2 start ecosystem.config.cjs --update-env
 pm2 save >/dev/null
-
-pm2 status
