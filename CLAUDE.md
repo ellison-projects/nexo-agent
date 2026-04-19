@@ -33,9 +33,19 @@ The agent currently has:
     - `.txt` — default for lists, notes, exports. Inline viewer on every client, no download needed. Best all-around choice.
     - `.csv` — tabular data. Renders as a rough table in the desktop viewer; plainer on mobile.
     - `.json` — code/structured data. Inline viewer with syntax highlighting on desktop. **Always prettify before sending** (`JSON.stringify(obj, null, 2)`) — minified JSON is unreadable in the preview.
-    - `.pdf` — when polish matters (formatted reports, anything Matt might share). Built-in viewer on every client.
-    - **Avoid `.md`** — Telegram does not render markdown in document previews; `**bold**` shows as literal asterisks. Use `.txt` instead and skip the markdown syntax, or render to PDF.
+    - `.pdf` — when polish matters (formatted reports, anything Matt might share). Built-in viewer on every client. **Generated from Typst** — don't try to write PDF bytes by hand; see the Typst flow below.
+    - **Avoid `.md`** — Telegram does not render markdown in document previews; `**bold**` shows as literal asterisks. Use `.txt` instead and skip the markdown syntax, or render to PDF via Typst.
     - **Avoid `.html`** — no inline preview; usually prompts a download.
+  - **PDF via Typst** — to produce a polished PDF, write a `.typ` file to `/tmp/<name>.typ` and pass it to `npm run send-file`. If the input path ends in `.typ`, the script compiles it to `/tmp/<name>.pdf` via `compileTypst` (`src/pdf.ts`, using `@myriaddreamin/typst-ts-node-compiler`) and sends the PDF. No external binary needed — the compiler is a Node dependency. Typst syntax cheat sheet (enough for most exports):
+    - Headings: `= H1`, `== H2`, `=== H3` (one `=` per level, space after).
+    - Emphasis: `*bold*`, `_italic_`.
+    - Lists: `- item` (bullets), `+ item` (numbered). Indent with two spaces to nest.
+    - Inline code: `` `code` ``. Code blocks: ` ```lang\n...\n``` ` (triple backticks, optional language).
+    - Links: `#link("https://example.com")[label]`.
+    - Tables: `#table(columns: 2, [Header A], [Header B], [a1], [b1])` — one cell per bracketed content, in row-major order.
+    - Page break: `#pagebreak()`. Horizontal rule: `#line(length: 100%)`.
+    - Comments: `// single line` or `/* block */`.
+    - When in doubt, keep it simple — plain prose + headings + lists covers 90% of what Matt will ask for.
 
 Additional skills will likely land here over time (calendar, email, etc.). When they do, list them in this section.
 
@@ -54,10 +64,11 @@ There is no test suite, linter, or typecheck script. `tsconfig.json` is `noEmit:
 
 Two pm2 apps sharing one repo:
 
-**Agent (`nexo-agent`)** — four small files, each a single responsibility:
+**Agent (`nexo-agent`)** — a few small files, each a single responsibility:
 
 - `src/index.ts` — long-poll loop. On startup, `skipBacklog()` advances the offset past queued updates so the agent doesn't replay missed messages. For each new message: post a `....` placeholder, call `askNexo`, edit the placeholder with the result (fall back to a new message if the edit fails). Filters to a single `TELEGRAM_CHAT_ID`.
 - `src/telegram.ts` — thin `fetch` wrapper over the Telegram Bot API (`sendMessage`, `editMessage`, `sendDocument`, `getUpdates`, `fetchPhoto`). `fetchPhoto` returns both a local `tmpdir` path (so the agent can `Read` the image) and the public `api.telegram.org/file/...` URL (so the agent can forward it to Nexo as an `image_urls` value). `sendDocument` uploads a local file as a Telegram document (multipart `FormData` — Node 22+ native); invoked from `scripts/send-file.ts` via `npm run send-file`. No SDK.
+- `src/pdf.ts` — one function, `compileTypst(typPath, pdfPath)`, wrapping `@myriaddreamin/typst-ts-node-compiler`. Creates a fresh `NodeCompiler` per call with `workspace` set to the `.typ` file's parent directory (required — Typst rejects entry files outside the workspace root), compiles to a PDF buffer, writes it out. Used by `scripts/send-file.ts` when the input path ends in `.typ`.
 - `src/ai.ts` — wraps `@anthropic-ai/claude-agent-sdk`'s `query()`. Two things that matter:
   - **Session persistence.** The `session_id` returned on each `result` message is written to `.session-id` (gitignored) and passed as `resume` on the next call. This is what lets the agent remember prior Telegram turns across process restarts. If you change the message-handling flow, preserve this write.
   - **Agent config.** Runs with `permissionMode: 'bypassPermissions'`, `allowDangerouslySkipPermissions: true`, `cwd` from `NEXO_AGENT_CWD` env var (falls back to `process.cwd()`), and `settingSources: ['project', 'user', 'local']` — the agent reads this repo's `.claude/` config so skills and settings take effect. The system prompt lives in `SYSTEM_PROMPT` in this file and frames the agent as Nexo, my personal assistant.
