@@ -14,7 +14,7 @@ Near Dallas, Texas. Work from home.
 
 ## Work
 
-- **Day job:** DoctorLogic (full-time software engineer)
+- **Day job:** DoctorLogic (full-time software engineer, Monday–Friday 9am–5pm)
 - **Main side project:** Lawn Engine (current focus for "Life 2.0")
 - **Other ventures:** Unabated, Declassified Records, Carfluent (advising/building)
 
