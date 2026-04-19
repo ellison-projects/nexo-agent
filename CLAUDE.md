@@ -31,7 +31,7 @@ Additional skills will likely land here over time (calendar, email, etc.). When 
 
 - `npm run dev` — run the agent locally with `tsx` and `.env` loaded. No build step; TypeScript runs directly.
 - `npm start` — start under pm2 using `ecosystem.config.cjs`.
-- `npm run restart` — runs `scripts/restart.sh`: `pm2 delete`s both apps first (so pm2's autorestart can't fire while we're cleaning up), `pkill`s any stray `tsx` dev processes, then `pm2 start`s fresh. Use this instead of `pm2 restart` alone; the agent must be single-instance and a plain restart can double-start it (two "Nexo online" messages + a git-pull race).
+- `npm run restart` — runs `scripts/restart.sh`: runs `cleanup.sh` first to prune pm2 zombies / duplicates / stale entries, then `pm2 delete`s both apps (so pm2's autorestart can't fire while we're cleaning up), `pkill`s any stray `tsx` dev processes, then `pm2 start`s fresh. Self-heals from most pm2 state mess. Use this instead of `pm2 restart` alone; the agent must be single-instance and a plain restart can double-start it.
 - `npm run stop` / `npm run logs` / `npm run status` — pm2 passthroughs.
 - `npm run reset-session` — deletes `.session-id` and restarts. Use when the agent's accumulated Telegram conversation context has gone stale or wrong.
 - `npm run cleanup` — runs `scripts/cleanup.sh`: treats `ecosystem.config.cjs` as the source of truth for pm2 and prunes anything that doesn't belong. Deletes pm2 apps whose name isn't in the ecosystem file (catches renamed zombies — e.g. `telegram-bot` after a rename to `nexo-agent`), and deletes extra entries past the oldest for apps that are. No restart, keeps the survivors running.
