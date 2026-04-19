@@ -39,7 +39,9 @@ There is no test suite, linter, or typecheck script. `tsconfig.json` is `noEmit:
 
 ## Architecture
 
-Four small files, each a single responsibility:
+Two pm2 apps sharing one repo:
+
+**Agent (`nexo-agent`)** — four small files, each a single responsibility:
 
 - `src/index.ts` — long-poll loop. On startup, `skipBacklog()` advances the offset past queued updates so the agent doesn't replay missed messages. For each new message: post a `....` placeholder, call `askNexo`, edit the placeholder with the result (fall back to a new message if the edit fails). Filters to a single `TELEGRAM_CHAT_ID`.
 - `src/telegram.ts` — thin `fetch` wrapper over the Telegram Bot API (`sendMessage`, `editMessage`, `getUpdates`, `fetchPhoto`). `fetchPhoto` returns both a local `tmpdir` path (so the agent can `Read` the image) and the public `api.telegram.org/file/...` URL (so the agent can forward it to Nexo as an `image_urls` value). No SDK.
@@ -47,6 +49,10 @@ Four small files, each a single responsibility:
   - **Session persistence.** The `session_id` returned on each `result` message is written to `.session-id` (gitignored) and passed as `resume` on the next call. This is what lets the agent remember prior Telegram turns across process restarts. If you change the message-handling flow, preserve this write.
   - **Agent config.** Runs with `permissionMode: 'bypassPermissions'`, `allowDangerouslySkipPermissions: true`, `cwd` from `NEXO_AGENT_CWD` env var (falls back to `process.cwd()`), and `settingSources: ['project', 'user', 'local']` — the agent reads this repo's `.claude/` config so skills and settings take effect. The system prompt lives in `SYSTEM_PROMPT` in this file and frames the agent as Nexo, my personal assistant.
 - `src/env.ts` — fails fast on missing `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `NEXO_API_KEY`, `NEXO_USER`.
+
+**Web (`nexo-web`)** — a tiny static server the agent can use to share content:
+
+- `src/web/server.ts` — zero-dep Node `http` server. Serves `public/index.html` at `/` (and `/index.html`); everything else is 404, non-GET is 405. Listens on `WEB_PORT` (default `8080`). The agent edits `public/index.html` to update what's shared.
 
 ## Interpreting short commands from the user
 
