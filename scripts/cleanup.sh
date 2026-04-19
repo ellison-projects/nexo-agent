@@ -18,5 +18,3 @@ pkill -f 'tsx.*src/web/server.ts' || true
 echo "  - Starting apps fresh from ecosystem.config.cjs"
 pm2 start ecosystem.config.cjs --update-env
 pm2 save >/dev/null
-
-pm2 status
