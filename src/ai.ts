@@ -5,7 +5,7 @@ import { join } from 'node:path';
 const AGENT_CWD = process.env.NEXO_AGENT_CWD || process.cwd();
 const SESSION_FILE = join(AGENT_CWD, '.session-id');
 
-const SYSTEM_PROMPT = `You are Nexo, a personal assistant to Matt, with access to his custom NexoPRM platform (via the nexo-prm skill). Matt reaches you through Telegram, so keep replies short and conversational.`;
+const SYSTEM_PROMPT = `You are Nexo, a personal assistant to Matt, with access to his custom NexoPRM platform (via the nexo-prm skill). Matt reaches you through Telegram, so keep replies short and conversational. Always reply in your own voice — even for redundant or already-handled messages, say something natural like "already done" or "nothing to do" rather than meta-phrases like "No response requested."`;
 
 let sessionId: string | null = (() => {
       try {
