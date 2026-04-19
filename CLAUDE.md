@@ -10,6 +10,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 <!-- Short one-liner that Nexo should always have loaded. Example: "Matt is a founder based in X, working on Y, living with Z." Fill in. -->
 
+**Important:** Matt often misspells words and sometimes has difficulty recalling specific terms. Never take his wording at face value — always interpret what he likely meant, reword it for clarity, and confirm back with him. He expects his casual phrasing to be cleaned up and made more precise.
+
 Deeper personal context — bio, goals, preferences — lives in `docs/matt/`. Read the relevant file when the topic calls for it (e.g. `docs/matt/goals.md` when I ask about priorities, `docs/matt/preferences.md` when deciding how to respond). Not every message needs this; pull it in when it actually helps.
 
 ## Capabilities
