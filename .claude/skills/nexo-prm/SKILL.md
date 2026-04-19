@@ -94,9 +94,11 @@ Read-only roll-up of the user's whole state. Use for open-ended prompts ("debrie
 - `GET|PATCH|DELETE /api/agent/things-to-remember/{id}` — PATCH body `{ content }`.
 
 ### AI reminders
-- `GET /api/agent/ai-reminders?personId=&status=&dueBefore=&limit=&offset=` — status one of `new`, `done`, `dismissed`.
-- `GET /api/agent/ai-reminders/{id}`
-- `PATCH /api/agent/ai-reminders/{id}` — only `status` mutable.
+Two sources: `moment` (AI-generated from a moment) and `manual` (agent-created one-offs via POST).
+- `GET /api/agent/ai-reminders?personId=&status=&dueBefore=&source=&limit=&offset=` — status one of `new`, `done`, `dismissed`. `source` one of `moment`, `manual`.
+- `POST /api/agent/ai-reminders` — create a one-off manual reminder. Required: `due_at`, `message_template`. Optional: `notes`, `person_id`, `category`, `rationale`, `status`. Stored with `source='manual'`, `moment_id=null`. `message_template` is the short line; use `notes` for longer details the user will want when the reminder surfaces.
+- `GET /api/agent/ai-reminders/{id}` — response includes `source`; manual reminders have `moment_id=null`.
+- `PATCH /api/agent/ai-reminders/{id}` — update any subset of `status`, `due_at`, `message_template`, `notes`, `person_id`. Pass `person_id: null` to detach the person, or `notes: null`/`""` to clear notes. Works for both moment-sourced and manual reminders.
 
 ### Relationships
 - `GET|POST /api/agent/relationships` — POST body `{ name, notes, reminder }`.
@@ -432,6 +434,7 @@ Trust the briefing — don't pad the output with extra calls to `/working-notes/
 ## Other common operations (quick reference)
 
 - **Look up a birthday:** `GET /people?q=...` → `GET /people/{id}` → scan `important_dates`.
+- **Create a manual reminder:** `POST /ai-reminders` with `{ "due_at": "2026-04-25T17:00:00Z", "message_template": "Check in with Sarah", "notes": "Ask about her dad's recovery", "person_id": "42" }` (person_id and notes optional).
 - **Mark a reminder handled:** `GET /ai-reminders?status=new` → `PATCH /ai-reminders/{id}` with `{ "status": "done" }`.
 - **Add a durable fact about someone:** resolve id → `POST /things-to-remember` with `{ person_id, content }`.
 - **Check off a plan item:** `GET /working-notes/latest` → find item → `PATCH /working-note-items/{id}` with `{ "checked": true }`.
