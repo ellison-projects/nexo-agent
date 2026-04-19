@@ -3,10 +3,11 @@
   "type": "module",
   "scripts": {
     "dev": "npx tsx --env-file=.env src/index.ts",
+    "dev:web": "npx tsx --env-file=.env src/web/server.ts",
     "start": "pm2 start ecosystem.config.cjs",
-    "stop": "pm2 stop nexo-agent",
-    "restart": "pkill -f 'tsx.*src/index.ts' || true && pm2 restart nexo-agent",
-    "logs": "pm2 logs nexo-agent",
+    "stop": "pm2 stop ecosystem.config.cjs",
+    "restart": "./scripts/restart.sh",
+    "logs": "pm2 logs",
     "status": "pm2 status",
     "reset-session": "rm -f \"${NEXO_AGENT_CWD:-.}/.session-id\" && npm run restart"
   },
