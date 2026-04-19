@@ -10,7 +10,8 @@
     "cleanup": "./scripts/cleanup.sh",
     "logs": "pm2 logs",
     "status": "pm2 status",
-    "reset-session": "rm -f \"${NEXO_AGENT_CWD:-.}/.session-id\" && npm run restart"
+    "reset-session": "rm -f \"${NEXO_AGENT_CWD:-.}/.session-id\" && npm run restart",
+    "send-file": "npx tsx --env-file=.env scripts/send-file.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.59"

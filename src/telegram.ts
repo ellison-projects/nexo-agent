@@ -1,6 +1,6 @@
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { extname, join } from 'node:path';
+import { basename, extname, join } from 'node:path';
 import { env } from './env';
 
 const API = `https://api.telegram.org/bot${env.telegramBotToken}`;
@@ -93,6 +93,19 @@ export async function getUpdates(offset: number, timeoutSeconds = 30): Promise<T
       const res = await fetch(`${API}/getUpdates?offset=${offset}&timeout=${timeoutSeconds}`);
       const data = (await res.json()) as { ok: boolean; result: TelegramUpdate[] };
       return data.ok ? data.result : [];
+}
+
+export async function sendDocument(chatId: number, filePath: string, caption?: string): Promise<number> {
+      const bytes = await readFile(filePath);
+      const form = new FormData();
+      form.append('chat_id', String(chatId));
+      form.append('document', new Blob([new Uint8Array(bytes)]), basename(filePath));
+      if (caption) form.append('caption', caption);
+
+      const res = await fetch(`${API}/sendDocument`, { method: 'POST', body: form });
+      if (!res.ok) throw new Error(`Telegram sendDocument failed: ${res.status} ${await res.text()}`);
+      const data = (await res.json()) as { ok: boolean; result: { message_id: number } };
+      return data.result.message_id;
 }
 
 export async function fetchPhoto(fileId: string): Promise<{ localPath: string; publicUrl: string }> {
