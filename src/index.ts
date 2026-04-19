@@ -109,42 +109,45 @@ async function work(): Promise<void> {
             }
             const item = queue.shift()!;
             state.processing = true;
-
-            if (item.placeholderId !== null) {
-                  await editMessage(item.chatId, item.placeholderId, '....').catch(() => {});
-            }
-            for (let i = 0; i < queue.length; i++) {
-                  const q = queue[i];
-                  if (q.placeholderId === null) continue;
-                  await editMessage(q.chatId, q.placeholderId, placeholderText(i + 2)).catch(() => {});
-            }
-
-            const { msg, placeholderId, chatId } = item;
-            const text = msg.text ?? msg.caption ?? '';
-            const largestPhoto = msg.photo?.at(-1);
             let imagePath: string | null = null;
-            let imageUrl: string | null = null;
             try {
-                  if (largestPhoto) {
-                        const photo = await fetchPhoto(largestPhoto.file_id);
-                        imagePath = photo.localPath;
-                        imageUrl = photo.publicUrl;
+                  if (item.placeholderId !== null) {
+                        await editMessage(item.chatId, item.placeholderId, '....').catch(() => {});
                   }
-                  const reply = await askNexo(text, imagePath, imageUrl);
-                  console.log(`Bot: ${reply}`);
-                  if (placeholderId !== null) {
-                        await editMessage(chatId, placeholderId, reply);
-                  } else {
-                        await sendMessage(chatId, reply);
+                  for (let i = 0; i < queue.length; i++) {
+                        const q = queue[i];
+                        if (q.placeholderId === null) continue;
+                        await editMessage(q.chatId, q.placeholderId, placeholderText(i + 2)).catch(() => {});
+                  }
+
+                  const { msg, placeholderId, chatId } = item;
+                  const text = msg.text ?? msg.caption ?? '';
+                  const largestPhoto = msg.photo?.at(-1);
+                  let imageUrl: string | null = null;
+                  try {
+                        if (largestPhoto) {
+                              const photo = await fetchPhoto(largestPhoto.file_id);
+                              imagePath = photo.localPath;
+                              imageUrl = photo.publicUrl;
+                        }
+                        const reply = await askNexo(text, imagePath, imageUrl);
+                        console.log(`Bot: ${reply}`);
+                        if (placeholderId !== null) {
+                              await editMessage(chatId, placeholderId, reply);
+                        } else {
+                              await sendMessage(chatId, reply);
+                        }
+                  } catch (err) {
+                        console.error('Failed to handle message:', err);
+                        const errText = 'Something broke on my end. Try again.';
+                        if (placeholderId !== null) {
+                              await editMessage(chatId, placeholderId, errText).catch(() => {});
+                        } else {
+                              await sendMessage(chatId, errText).catch(() => {});
+                        }
                   }
             } catch (err) {
-                  console.error('Failed to handle message:', err);
-                  const errText = 'Something broke on my end. Try again.';
-                  if (placeholderId !== null) {
-                        await editMessage(chatId, placeholderId, errText).catch(() => {});
-                  } else {
-                        await sendMessage(chatId, errText).catch(() => {});
-                  }
+                  console.error('Worker iteration crashed:', err);
             } finally {
                   if (imagePath) {
                         await unlink(imagePath).catch(() => {});
