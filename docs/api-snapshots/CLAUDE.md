@@ -4,11 +4,12 @@ This directory stores timestamped snapshots of the NexoPRM Agent API documentati
 
 ## Naming Convention
 
-Each snapshot is timestamped with ISO 8601 format:
+Each snapshot pair is timestamped with ISO 8601 format:
 
-- `llm-YYYY-MM-DD-HHMMSS.md` - e.g., `llm-2026-04-18-213000.md`
+- `llm-YYYY-MM-DD-HHMMSS.md` - API reference docs
+- `features-YYYY-MM-DD-HHMMSS.md` - product features summary
 
-The most recent snapshot should also be copied to `llm.md` (no timestamp) for easy reference.
+The most recent snapshots are also copied to `llm.md` and `features.md` (no timestamp) for easy reference.
 
 ## Creating a New Snapshot
 
@@ -17,7 +18,9 @@ When updating the API docs:
 ```bash
 TIMESTAMP=$(date -u +"%Y-%m-%d-%H%M%S")
 curl -s "https://app.nexoprm.com/agentapi/llm.md" > "docs/api-snapshots/llm-${TIMESTAMP}.md"
-cp "docs/api-snapshots/llm-${TIMESTAMP}.md" docs/api-snapshots/llm.md
+curl -s "https://app.nexoprm.com/api/agent/features" | jq -r '.content' > "docs/api-snapshots/features-${TIMESTAMP}.md"
+yes | cp "docs/api-snapshots/llm-${TIMESTAMP}.md" docs/api-snapshots/llm.md 2>/dev/null
+yes | cp "docs/api-snapshots/features-${TIMESTAMP}.md" docs/api-snapshots/features.md 2>/dev/null
 ```
 
 ## Comparing Changes
@@ -25,8 +28,11 @@ cp "docs/api-snapshots/llm-${TIMESTAMP}.md" docs/api-snapshots/llm.md
 To see what changed between snapshots:
 
 ```bash
-# Compare two specific snapshots
+# Compare API reference docs
 diff docs/api-snapshots/llm-2026-04-18-*.md docs/api-snapshots/llm-2026-04-19-*.md
+
+# Compare features
+diff docs/api-snapshots/features-2026-04-18-*.md docs/api-snapshots/features-2026-04-19-*.md
 
 # Or use git diff
 git diff docs/api-snapshots/llm-2026-04-18-*.md docs/api-snapshots/llm-2026-04-19-*.md
@@ -37,5 +43,5 @@ git diff docs/api-snapshots/llm-2026-04-18-*.md docs/api-snapshots/llm-2026-04-1
 List all snapshots:
 
 ```bash
-ls -lt docs/api-snapshots/llm-*.md
+ls -lt docs/api-snapshots/{llm,features}-*.md
 ```
