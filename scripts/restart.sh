@@ -3,10 +3,14 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-# Delete by name first so pm2 forgets the apps entirely — this disables
-# autorestart before we start killing processes, and cleans up any duplicate
-# entries left by previous `pm2 start` runs. `pm2 delete` takes app names, not
-# an ecosystem file path.
+# Prune any zombies / duplicates first (e.g. renamed-app leftovers, stale
+# pm_ids from a crashed pm2 boot) before we touch our own apps. Failures
+# here shouldn't block a restart — the pm2 delete below is the belt.
+./scripts/cleanup.sh >/dev/null 2>&1 || true
+
+# Delete by name so pm2 forgets the apps entirely — this disables autorestart
+# before we start killing processes, and clears any duplicate entries left by
+# previous `pm2 start` runs. `pm2 delete` takes app names, not a file path.
 pm2 delete nexo-agent nexo-web >/dev/null 2>&1 || true
 
 # Clean up any stray dev-mode tsx processes (npm run dev / dev:web orphans).
