@@ -31,7 +31,7 @@ Additional skills will likely land here over time (calendar, email, etc.). When 
 
 - `npm run dev` — run the agent locally with `tsx` and `.env` loaded. No build step; TypeScript runs directly.
 - `npm start` — start under pm2 using `ecosystem.config.cjs`.
-- `npm run restart` — kills any lingering `tsx src/index.ts` processes, then `pm2 restart nexo-agent`. Use this instead of `pm2 restart` alone; duplicated processes have happened before and the agent must be single-instance.
+- `npm run restart` — runs `scripts/restart.sh`: kills any stray `tsx` dev processes for both apps, then `pm2 startOrRestart ecosystem.config.cjs` so both `nexo-agent` and `nexo-web` end up registered and running (fresh box or existing install). Use this instead of `pm2 restart` alone; duplicated processes have happened before and the agent must be single-instance.
 - `npm run stop` / `npm run logs` / `npm run status` — pm2 passthroughs.
 - `npm run reset-session` — deletes `.session-id` and restarts. Use when the agent's accumulated Telegram conversation context has gone stale or wrong.
 
