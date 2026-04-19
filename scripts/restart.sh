@@ -3,10 +3,11 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-# Delete first so pm2 forgets the apps entirely — this disables autorestart
-# before we start killing processes. Otherwise pkill trips autorestart and we
-# get a duplicate "Nexo online 🚀" message plus a git-pull race.
-pm2 delete ecosystem.config.cjs >/dev/null 2>&1 || true
+# Delete by name first so pm2 forgets the apps entirely — this disables
+# autorestart before we start killing processes, and cleans up any duplicate
+# entries left by previous `pm2 start` runs. `pm2 delete` takes app names, not
+# an ecosystem file path.
+pm2 delete nexo-agent nexo-web >/dev/null 2>&1 || true
 
 # Clean up any stray dev-mode tsx processes (npm run dev / dev:web orphans).
 pkill -f 'tsx.*src/index.ts' || true
