@@ -15,9 +15,22 @@ let sessionId: string | null = (() => {
       }
 })();
 
-export async function askNexo(userMessage: string, imagePath?: string | null): Promise<string> {
+export async function askNexo(
+      userMessage: string,
+      imagePath?: string | null,
+      imageUrl?: string | null,
+): Promise<string> {
       const prompt = imagePath
-            ? `${userMessage}\n\nImage attached at: ${imagePath}\n(Use the Read tool to view it.)`.trim()
+            ? [
+                    userMessage,
+                    '',
+                    `Image attached at: ${imagePath}`,
+                    '(Use the Read tool to view it.)',
+                    imageUrl ? `If saving this image to Nexo, pass this public URL in the relevant image field (e.g. image_urls): ${imageUrl}` : '',
+              ]
+                    .filter(Boolean)
+                    .join('\n')
+                    .trim()
             : userMessage;
 
       const response = query({

@@ -95,19 +95,20 @@ export async function getUpdates(offset: number, timeoutSeconds = 30): Promise<T
       return data.ok ? data.result : [];
 }
 
-export async function downloadPhoto(fileId: string): Promise<string> {
+export async function fetchPhoto(fileId: string): Promise<{ localPath: string; publicUrl: string }> {
       const infoRes = await fetch(`${API}/getFile?file_id=${encodeURIComponent(fileId)}`);
       if (!infoRes.ok) throw new Error(`Telegram getFile failed: ${infoRes.status} ${await infoRes.text()}`);
       const info = (await infoRes.json()) as { ok: boolean; result: { file_path: string } };
       if (!info.ok) throw new Error('Telegram getFile returned ok=false');
 
       const remotePath = info.result.file_path;
+      const publicUrl = `${FILE_API}/${remotePath}`;
       const ext = extname(remotePath) || '.jpg';
       const localPath = join(tmpdir(), `nexo-bot-${fileId}${ext}`);
 
-      const fileRes = await fetch(`${FILE_API}/${remotePath}`);
+      const fileRes = await fetch(publicUrl);
       if (!fileRes.ok) throw new Error(`Telegram file download failed: ${fileRes.status}`);
       const bytes = Buffer.from(await fileRes.arrayBuffer());
       await writeFile(localPath, bytes);
-      return localPath;
+      return { localPath, publicUrl };
 }

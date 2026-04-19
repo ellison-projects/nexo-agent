@@ -1,7 +1,7 @@
 import { unlink } from 'node:fs/promises';
 import { execSync } from 'node:child_process';
 import { env } from './env';
-import { downloadPhoto, editMessage, getUpdates, sendMessage } from './telegram';
+import { fetchPhoto, editMessage, getUpdates, sendMessage } from './telegram';
 import { askNexo } from './ai';
 
 async function skipBacklog(): Promise<number> {
@@ -52,11 +52,14 @@ async function main() {
                         const processingId = await sendMessage(msg.chat.id, '....').catch(() => null);
 
                         let imagePath: string | null = null;
+                        let imageUrl: string | null = null;
                         try {
                               if (largestPhoto) {
-                                    imagePath = await downloadPhoto(largestPhoto.file_id);
+                                    const photo = await fetchPhoto(largestPhoto.file_id);
+                                    imagePath = photo.localPath;
+                                    imageUrl = photo.publicUrl;
                               }
-                              const reply = await askNexo(text, imagePath);
+                              const reply = await askNexo(text, imagePath, imageUrl);
                               console.log(`Bot: ${reply}`);
                               if (processingId !== null) {
                                     await editMessage(msg.chat.id, processingId, reply);
