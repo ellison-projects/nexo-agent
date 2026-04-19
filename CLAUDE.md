@@ -28,7 +28,14 @@ The agent currently has:
 - **`remember` skill** (`.claude/skills/remember/`) — turns casual "remember X" requests into durable notes committed into the repo. Routes facts to the right file under `docs/` (project docs, `docs/matt/*`, or `CLAUDE.md`), confirms wording and destination, then commits and pushes. For facts about a person already in PRM, it defers to `nexo-prm` instead.
 - **`refresh-api-docs` skill** (`.claude/skills/refresh-api-docs/`) — pulls the latest `llm.md` reference and `features.md` summary from `app.nexoprm.com`, writes timestamped snapshots to `docs/api-snapshots/`, updates the unsuffixed aliases, diffs against the prior snapshot, summarizes the changes, and auto-commits/pushes. Triggers on "refresh the api docs", "snapshot the api", etc.
 - **Standard Claude Code tools** — Read/Glob/Grep/Bash/etc. via the `claude_code` preset. Available for any task that calls for them — codebase work, shell commands, research, etc.
-- **Send files back via Telegram** — `npm run send-file -- <path> [caption...]` (wraps `scripts/send-file.ts`, which calls `sendDocument` in `src/telegram.ts`). Use this when Matt asks for an export — a list of recurring tasks, a CSV, a long report, etc. Flow: generate the content → write it to a `/tmp/*.{txt,md,csv,json}` file → run the npm command → confirm in the reply. Default to this over inline text when the output is long, structured, or meant to be saved. For quick reads that fit in a message, just reply normally.
+- **Send files back via Telegram** — `npm run send-file -- <path> [caption...]` (wraps `scripts/send-file.ts`, which calls `sendDocument` in `src/telegram.ts`). Use this when Matt asks for an export — a list of recurring tasks, a CSV, a long report, etc. Flow: generate the content → write it to a `/tmp/*.{txt,csv,json,pdf}` file → run the npm command → confirm in the reply. Default to this over inline text when the output is long, structured, or meant to be saved. For quick reads that fit in a message, just reply normally.
+  - **File format guide** (Telegram's in-app preview varies by type — pick the one that reads best):
+    - `.txt` — default for lists, notes, exports. Inline viewer on every client, no download needed. Best all-around choice.
+    - `.csv` — tabular data. Renders as a rough table in the desktop viewer; plainer on mobile.
+    - `.json` — code/structured data. Inline viewer with syntax highlighting on desktop. **Always prettify before sending** (`JSON.stringify(obj, null, 2)`) — minified JSON is unreadable in the preview.
+    - `.pdf` — when polish matters (formatted reports, anything Matt might share). Built-in viewer on every client.
+    - **Avoid `.md`** — Telegram does not render markdown in document previews; `**bold**` shows as literal asterisks. Use `.txt` instead and skip the markdown syntax, or render to PDF.
+    - **Avoid `.html`** — no inline preview; usually prompts a download.
 
 Additional skills will likely land here over time (calendar, email, etc.). When they do, list them in this section.
 
