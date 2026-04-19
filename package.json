@@ -7,6 +7,7 @@
     "start": "pm2 start ecosystem.config.cjs",
     "stop": "pm2 stop ecosystem.config.cjs",
     "restart": "./scripts/restart.sh",
+    "dedupe": "./scripts/dedupe.sh",
     "logs": "pm2 logs",
     "status": "pm2 status",
     "reset-session": "rm -f \"${NEXO_AGENT_CWD:-.}/.session-id\" && npm run restart"
