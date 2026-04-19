@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# When the agent itself triggers a restart (via Telegram), this script runs
+# as a child of the agent process. `pm2 delete nexo-agent` below then kills
+# that parent, which takes us down with it before `pm2 start` runs. Detect
+# non-interactive invocation and re-launch ourselves in a new session so we
+# survive the parent's death.
+if [ ! -t 0 ] && [ "${NEXO_RESTART_DETACHED:-}" != "1" ]; then
+  LOG=/tmp/nexo-restart.log
+  NEXO_RESTART_DETACHED=1 setsid -f bash "$0" "$@" </dev/null >"$LOG" 2>&1
+  echo "Restart running detached — tail $LOG for progress."
+  exit 0
+fi
+
 cd "$(dirname "$0")/.."
 
 # Delete by name so pm2 forgets the apps entirely — this disables autorestart
