@@ -42,7 +42,17 @@ async function main() {
                         offset = update.update_id + 1;
                         const msg = update.message;
                         if (!msg) continue;
-                        if (String(msg.chat.id) !== env.telegramChatId) continue;
+
+                        // Notify user of unknown senders
+                        if (String(msg.chat.id) !== env.telegramChatId) {
+                              const username = msg.from?.username ? `@${msg.from.username}` : msg.from?.first_name ?? 'unknown';
+                              const chatType = msg.chat.type === 'private' ? 'private chat' : msg.chat.type;
+                              await sendMessage(
+                                    Number(env.telegramChatId),
+                                    `⚠️ Message received from unknown ${chatType}: ${username} (ID: ${msg.chat.id})`
+                              ).catch(() => {});
+                              continue;
+                        }
 
                         const text = msg.text ?? msg.caption ?? '';
                         const largestPhoto = msg.photo?.at(-1);
