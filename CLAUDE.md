@@ -34,7 +34,7 @@ Additional skills will likely land here over time (calendar, email, etc.). When 
 - `npm run restart` — runs `scripts/restart.sh`: `pm2 delete`s both apps first (so pm2's autorestart can't fire while we're cleaning up), `pkill`s any stray `tsx` dev processes, then `pm2 start`s fresh. Use this instead of `pm2 restart` alone; the agent must be single-instance and a plain restart can double-start it (two "Nexo online" messages + a git-pull race).
 - `npm run stop` / `npm run logs` / `npm run status` — pm2 passthroughs.
 - `npm run reset-session` — deletes `.session-id` and restarts. Use when the agent's accumulated Telegram conversation context has gone stale or wrong.
-- `npm run cleanup` — runs `scripts/cleanup.sh`: inspects `pm2 jlist`, and for any app name with more than one entry deletes the extras by `pm_id`, keeping the oldest. Use when you suspect duplicate pm2 entries (e.g. two `nexo-agent` rows in `pm2 status`) without wanting to restart anything.
+- `npm run cleanup` — runs `scripts/cleanup.sh`: treats `ecosystem.config.cjs` as the source of truth for pm2 and prunes anything that doesn't belong. Deletes pm2 apps whose name isn't in the ecosystem file (catches renamed zombies — e.g. `telegram-bot` after a rename to `nexo-agent`), and deletes extra entries past the oldest for apps that are. No restart, keeps the survivors running.
 
 There is no test suite, linter, or typecheck script. `tsconfig.json` is `noEmit: true` — types are checked by the editor, not in CI.
 
