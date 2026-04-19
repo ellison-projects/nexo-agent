@@ -59,6 +59,8 @@ Two pm2 apps sharing one repo:
 
 When I say a single word like "restart", "logs", "reset", "status" etc., first check `package.json` scripts — it's almost always a reference to one of those. If there's no obvious match or multiple plausible ones, ask before acting.
 
+**"Restart" (and anything around that word — "restart again", "bounce it", "reboot nexo", "kick the bot", etc.) always means run `npm run restart`.** Don't treat a repeat "restart" as redundant conversation; re-run the command. The restart script is idempotent and safe to run back-to-back.
+
 When I ask you to run a command, state the exact command you're about to run **before** invoking it, so I can catch a misinterpretation before it executes.
 
 ## Runtime constraints worth knowing
