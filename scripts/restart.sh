@@ -15,6 +15,26 @@ fi
 
 cd "$(dirname "$0")/.."
 
+# Detached runs have no parent to post to Telegram for us — the agent that
+# invoked us is being killed. Load .env ourselves and notify directly.
+if [ "${NEXO_RESTART_DETACHED:-}" = "1" ] && [ -f .env ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . ./.env
+  set +a
+fi
+
+notify() {
+  [ "${NEXO_RESTART_DETACHED:-}" = "1" ] || return 0
+  [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ] || return 0
+  curl -sS -o /dev/null --max-time 5 \
+    "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+    --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+    --data-urlencode "text=$1" || true
+}
+
+notify "🔄 Restarting Nexo..."
+
 # Delete by name so pm2 forgets the apps entirely — this disables autorestart
 # before we start killing processes, and clears any duplicate entries left by
 # previous `pm2 start` runs. Called one at a time because `pm2 delete a b` has
@@ -25,6 +45,8 @@ pm2 delete nexo-web >/dev/null 2>&1 || true
 # Clean up any stray dev-mode tsx processes (npm run dev / dev:web orphans).
 pkill -f 'tsx.*src/index.ts' || true
 pkill -f 'tsx.*src/web/server.ts' || true
+
+notify "🧹 Old processes cleared, booting fresh..."
 
 # Fresh start — apps were deleted above, so this is a clean register + boot.
 pm2 start ecosystem.config.cjs --update-env
