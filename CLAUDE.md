@@ -54,6 +54,7 @@ Two pm2 apps sharing one repo:
 **Web (`nexo-web`)** — a tiny static server the agent can use to share content:
 
 - `src/web/server.ts` — zero-dep Node `http` server. Serves `public/index.html` at `/` (and `/index.html`); everything else is 404, non-GET is 405. Listens on `WEB_PORT` (default `8080`). The agent edits `public/index.html` to update what's shared.
+- **Public URL:** `http://2.24.209.184:8080` — use this to serve Matt content (charts, reports, visualizations, etc.). Edit `public/index.html` to update what's displayed.
 
 ## Interpreting short commands from the user
 
