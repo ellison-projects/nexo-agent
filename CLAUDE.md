@@ -31,10 +31,10 @@ Additional skills will likely land here over time (calendar, email, etc.). When 
 
 - `npm run dev` — run the agent locally with `tsx` and `.env` loaded. No build step; TypeScript runs directly.
 - `npm start` — start under pm2 using `ecosystem.config.cjs`.
-- `npm run restart` — runs `scripts/restart.sh`: runs `cleanup.sh` first to prune pm2 zombies / duplicates / stale entries, then `pm2 delete`s both apps (so pm2's autorestart can't fire while we're cleaning up), `pkill`s any stray `tsx` dev processes, then `pm2 start`s fresh. Self-heals from most pm2 state mess. Use this instead of `pm2 restart` alone; the agent must be single-instance and a plain restart can double-start it.
+- `npm run restart` — runs `scripts/restart.sh`: `pm2 delete`s both apps by name (so pm2's autorestart can't fire while we're cleaning up), `pkill`s any stray `tsx` dev processes, then `pm2 start`s fresh. The everyday bounce — preserves Claude session memory in `.session-id`. Use this instead of `pm2 restart` alone; a plain `pm2 restart` can double-start the single-instance agent.
 - `npm run stop` / `npm run logs` / `npm run status` — pm2 passthroughs.
 - `npm run reset-session` — deletes `.session-id` and restarts. Use when the agent's accumulated Telegram conversation context has gone stale or wrong.
-- `npm run cleanup` — runs `scripts/cleanup.sh`: treats `ecosystem.config.cjs` as the source of truth for pm2 and prunes anything that doesn't belong. Deletes pm2 apps whose name isn't in the ecosystem file (catches renamed zombies — e.g. `telegram-bot` after a rename to `nexo-agent`), and deletes extra entries past the oldest for apps that are. No restart, keeps the survivors running.
+- `npm run cleanup` — runs `scripts/cleanup.sh`: the nuclear "reset to a clean state" button. Wipes `.session-id` (clears Claude's memory), `pm2 kill`s the daemon (stops every pm2-managed process — catches renamed zombies like `telegram-bot`, stale `pm_id`s, anything pm2 was tracking), `pkill`s stray `tsx` dev processes, then `pm2 start`s the apps fresh from `ecosystem.config.cjs`. Use when the box is in a weird state or you want a known-good baseline.
 
 There is no test suite, linter, or typecheck script. `tsconfig.json` is `noEmit: true` — types are checked by the editor, not in CI.
 
