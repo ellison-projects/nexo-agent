@@ -1,11 +1,18 @@
 ---
 name: refresh-api-docs
-description: Use when Matt wants to pull a fresh copy of the NexoPRM Agent API docs into the repo and see what changed. Fetches the canonical `llm.md` reference and the `features.md` product summary from app.nexoprm.com, writes timestamped snapshots into `docs/api-snapshots/`, updates the unsuffixed `llm.md` / `features.md` aliases, diffs against the prior snapshot, summarizes the changes, then auto-commits and pushes. Triggers: "refresh the api docs", "fetch the latest nexo api", "snapshot the api", "are the api docs current", "check for api changes", "update llm.md".
+description: Use when Matt wants to pull a fresh copy of the NexoPRM Agent API docs into the repo and see what changed. Fetches the canonical `llm.md` reference and the `features.md` product summary from app.nexoprm.com, writes timestamped snapshots into `docs/api-snapshots/`, updates the unsuffixed `llm.md` / `features.md` aliases, diffs against the prior snapshot, summarizes the changes, then auto-commits and pushes. Triggers: "refresh the api docs", "fetch the latest nexo api", "snapshot the api", "are the api docs current", "check for api changes", "update llm.md". Runs in a forked subagent — pass any caller notes as the argument (e.g. `force refresh`).
+context: fork
 ---
 
 # Refresh API docs
 
 Pulls a fresh copy of the NexoPRM Agent API documentation into the repo so the `nexo-prm` skill (and the agent in general) is reasoning against current endpoint shapes. This skill is the canonical spec for the snapshot mechanics — filename format, source URLs, alias copies, diff, and commit/push.
+
+## Your task
+
+Run the refresh flow below and return a summary of what changed. If `$ARGUMENTS` contains "force" or similar, bypass the "skip if fresher than ~1 hour" rule; otherwise follow the default behavior.
+
+Caller notes: $ARGUMENTS
 
 ## When this applies
 
