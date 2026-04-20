@@ -1,11 +1,18 @@
 ---
 name: look-ahead
-description: Use when Matt wants a forward-looking briefing — decision-first, "what needs attention next." Focuses on overdue AI reminders, upcoming important dates in the next 7 days, flagged plan items, and anything time-sensitive. Fetches and snapshots the briefing (shared mechanics with the `briefing` skill), but the review is oriented toward what to do next, not what's happened. Triggers: "look ahead", "what's coming up", "what's next", "what needs my attention", "what should I focus on", "morning briefing", "plan my day", "prep me for the day/week".
+description: Use when Matt wants a forward-looking briefing — decision-first, "what needs attention next." Focuses on overdue AI reminders, upcoming important dates in the next 7 days, flagged plan items, and anything time-sensitive. Fetches and snapshots the briefing (shared mechanics with the `briefing` skill), but the review is oriented toward what to do next, not what's happened. Triggers: "look ahead", "what's coming up", "what's next", "what needs my attention", "what should I focus on", "morning briefing", "plan my day", "prep me for the day/week". Runs in a forked subagent — pass any user focus as the argument if relevant.
+context: fork
 ---
 
 # Look-ahead briefing
 
 Forward-looking review. Decision-first framing: what's time-sensitive, what needs a call today, what's on the horizon.
+
+## Your task
+
+Run the look-ahead flow below and return the review to the caller. If `$ARGUMENTS` is non-empty, treat it as user-supplied emphasis or focus (e.g. "focus on work this week", "prep me for Friday"); otherwise produce the standard output.
+
+Caller-supplied focus: $ARGUMENTS
 
 ## Fetch + snapshot
 

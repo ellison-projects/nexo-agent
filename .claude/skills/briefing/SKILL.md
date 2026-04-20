@@ -1,11 +1,18 @@
 ---
 name: briefing
-description: Use when Matt wants a generic briefing without a clear forward-looking or backward-looking intent — the catch-all. Fetches the briefing endpoint, writes a timestamped snapshot to `briefings/`, and reviews progress since the prior snapshot (completed, new, still open). Also the canonical spec for snapshot mechanics — the `look-ahead` and `look-back` skills reference it. For "what's next / plan my day" framing use `look-ahead`. For "what got done / review my week" use `look-back`. Examples: "brief me", "daily briefing", "give me a briefing", "catch me up".
+description: Use when Matt wants a generic briefing without a clear forward-looking or backward-looking intent — the catch-all. Fetches the briefing endpoint, writes a timestamped snapshot to `public/briefings/`, and reviews progress since the prior snapshot (completed, new, still open). Also the canonical spec for snapshot mechanics — the `look-ahead` and `look-back` skills reference it. For "what's next / plan my day" framing use `look-ahead`. For "what got done / review my week" use `look-back`. Examples: "brief me", "daily briefing", "give me a briefing", "catch me up". Runs in a forked subagent — pass any user focus/emphasis as the argument if relevant.
+context: fork
 ---
 
 # Briefing skill
 
 Generic catch-all briefing. Chief-of-staff-style review, grounded in NexoPRM's briefing endpoint. For a quick todos-only rollup without snapshotting, the `nexo-prm` skill's "debrief" flow is the right tool instead. For forward-looking decision framing, use `look-ahead`. For retrospective "what got done" framing, use `look-back`.
+
+## Your task
+
+Run the full briefing flow below and return the review to the caller. If `$ARGUMENTS` is non-empty, treat it as user-supplied emphasis or focus (e.g. "focus on home items", "skip groceries") and adapt the review accordingly; otherwise produce the standard review.
+
+Caller-supplied focus: $ARGUMENTS
 
 This file also holds the canonical snapshot-mechanics spec (storage, filename, error handling) that the sibling skills reference. If you change the storage rules, change them here.
 

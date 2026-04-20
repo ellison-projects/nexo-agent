@@ -1,11 +1,18 @@
 ---
 name: look-back
-description: Use when Matt wants a retrospective briefing — what closed, what got done, what drifted. Draws primarily on the local `public/briefings/` snapshot history to diff the past against now. Useful for end-of-day wrap-ups, reflection, and weekly reviews. Triggers: "look back", "review my day/week", "how did this week go", "what did I finish", "what did I get done since Monday", "end-of-day brief", "evening briefing", "wrap up my week", "compare to yesterday's briefing".
+description: Use when Matt wants a retrospective briefing — what closed, what got done, what drifted. Draws primarily on the local `public/briefings/` snapshot history to diff the past against now. Useful for end-of-day wrap-ups, reflection, and weekly reviews. Triggers: "look back", "review my day/week", "how did this week go", "what did I finish", "what did I get done since Monday", "end-of-day brief", "evening briefing", "wrap up my week", "compare to yesterday's briefing". Runs in a forked subagent — pass any window selection or emphasis as the argument (e.g. `since Monday`, `compare to yesterday's 8am brief`).
+context: fork
 ---
 
 # Look-back briefing
 
 Retrospective review. Snapshot-history-first. Celebrates what closed, surfaces what drifted, notices patterns across the window.
+
+## Your task
+
+Run the look-back flow below and return the review to the caller. Parse `$ARGUMENTS` for window selection (e.g. "this week", "since Monday", "compare to yesterday's 8am brief") or emphasis. If empty, default to the window described below (since the most recent prior snapshot).
+
+Caller-supplied window/focus: $ARGUMENTS
 
 ## Fetch + snapshot
 

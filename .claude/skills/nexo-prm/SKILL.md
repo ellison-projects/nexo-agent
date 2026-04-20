@@ -1,9 +1,18 @@
 ---
 name: nexo-prm
-description: Use when the user wants to read or write their personal relationship data in NexoPRM — people, moments (timestamped observations about someone), things to remember, AI reminders, relationships, lists, connection groups, linked people, working notes (plans/todos), areas of focus, meals, food log, groceries, home items (household chores/maintenance), or stash (pocket knowledge base for non-person facts like products, places, gate codes). Also handles "debrief" — a read-only roll-up of open todos across home, groceries, and the current plan. Invoke for requests like "log that Sarah mentioned X", "who is Alex's birthday", "add milk to my groceries", "what's on my plan", "remind me that Jamie prefers texting", "remember that I like Reach floss", "save this cafe", "debrief me", or "what are my open todos". Calls the NexoPRM Agent API at app.nexoprm.com.
+description: Use when the user wants to read or write their personal relationship data in NexoPRM — people, moments (timestamped observations about someone), things to remember, AI reminders, relationships, lists, connection groups, linked people, working notes (plans/todos), areas of focus, meals, food log, groceries, home items (household chores/maintenance), or stash (pocket knowledge base for non-person facts like products, places, gate codes). Also handles "debrief" — a read-only roll-up of open todos across home, groceries, and the current plan. Invoke for requests like "log that Sarah mentioned X", "who is Alex's birthday", "add milk to my groceries", "what's on my plan", "remind me that Jamie prefers texting", "remember that I like Reach floss", "save this cafe", "debrief me", or "what are my open todos". Calls the NexoPRM Agent API at app.nexoprm.com. Runs in a forked subagent — when invoking, pass the user's full intent as the argument (e.g. `Add 'Coke Zero 12-pack' to Matt's grocery list`), since this skill has no access to conversation history.
+context: fork
 ---
 
 # NexoPRM Agent API
+
+## Your task
+
+$ARGUMENTS
+
+Fulfill the request above using the NexoPRM API reference below. Report back concisely with what you did (endpoint called, id returned, etc.) or what you found. If the request is a read, return the data the caller needs. If it's a write, confirm it happened.
+
+---
 
 Personal-relationship-manager API. Every request uses a god-mode bearer token plus a per-user impersonation header.
 
