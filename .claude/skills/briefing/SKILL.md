@@ -1,6 +1,6 @@
 ---
 name: briefing
-description: Use when Matt wants a generic briefing without a clear forward-looking or backward-looking intent — the catch-all. Fetches the briefing endpoint, writes a timestamped snapshot to `briefings/`, and reviews progress since the prior snapshot (completed, new, still open). Also the canonical spec for snapshot mechanics — the `look-ahead` and `look-back` skills reference it. For "what's next / plan my day" framing use `look-ahead`. For "what got done / review my week" use `look-back`. Examples: "brief me", "daily briefing", "give me a briefing", "catch me up". Runs in a forked subagent — pass any user focus/emphasis as the argument if relevant.
+description: Use when Matt wants a generic briefing without a clear forward-looking or backward-looking intent — the catch-all. Fetches the briefing endpoint, writes a timestamped snapshot to `public/briefings/`, and reviews progress since the prior snapshot (completed, new, still open). Also the canonical spec for snapshot mechanics — the `look-ahead` and `look-back` skills reference it. For "what's next / plan my day" framing use `look-ahead`. For "what got done / review my week" use `look-back`. Examples: "brief me", "daily briefing", "give me a briefing", "catch me up". Runs in a forked subagent — pass any user focus/emphasis as the argument if relevant.
 context: fork
 ---
 

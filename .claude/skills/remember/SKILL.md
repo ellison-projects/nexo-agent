@@ -1,6 +1,6 @@
 ---
 name: remember
-description: Use when Matt wants to save a durable fact into the repo — project knowledge, his own preferences/goals, tooling notes, or anything else that belongs in git rather than NexoPRM. Triggered by phrases like "remember that X", "note that X", "save that X", "make a note X", "jot down X". For facts about a specific person (moments, things-to-remember tied to someone) defer to the `nexo-prm` skill instead — those belong in PRM, not git. **Runs in a forked subagent with no conversation history.** Before invoking, the calling agent must (1) clean up the wording, (2) pick the destination using the decision tree in the skill body, (3) confirm both with Matt, then (4) invoke the skill with a fully-specified argument: `<cleaned fact> | <destination file path> | <heading or "new file">`. The skill itself does the file write + commit + push and nothing else.
+description: Use when Matt wants to save a durable fact into the repo — project knowledge, his own preferences/goals, tooling notes, or anything else that belongs in git rather than NexoPRM. Triggered by phrases like "remember that X", "note that X", "save that X", "make a note X", "jot down X". For facts about a specific person (moments, things-to-remember tied to someone) defer to the `nexo-prm` skill instead — those belong in PRM, not git. **Runs in a forked subagent with no conversation history.** Before invoking, the calling agent must (1) clean up the wording, (2) pick the destination using the decision tree in the skill body, (3) confirm both with Matt, then (4) invoke the skill with a fully-specified argument of the form `<cleaned fact> | <destination file path> | <heading>`, where `<heading>` is either an existing or desired heading name (e.g. `## People`) or the exact sentinel `new file` (unquoted) to create the destination. The `|` character is reserved as the field separator — it must not appear inside any field. The skill itself does the file write + commit + push and nothing else.
 context: fork
 ---
 
@@ -10,21 +10,31 @@ Durable-note writer for the repo. Runs in a forked subagent. By the time you're 
 
 ## Your task
 
-`$ARGUMENTS` is a pipe-delimited string:
+`$ARGUMENTS` is a pipe-delimited string with three fields:
 
 ```
-<cleaned fact sentence> | <destination file path> | <heading name or the literal string "new file">
+<cleaned fact sentence> | <destination file path> | <heading>
 ```
 
-**Parse it.** If any field is missing or the format is obviously wrong, stop and return an error describing what you received — don't guess.
+The `|` character is reserved as the field separator. It **must not appear inside any field** — if it does, the caller violated the contract.
+
+`<heading>` is either an existing or desired heading in the destination file (e.g. `## People`) or the exact sentinel `new file` (lowercase, unquoted, no surrounding whitespace) meaning "create the destination file fresh."
+
+**Parse it.**
+
+1. Split `$ARGUMENTS` on `|`. If the split does not produce exactly three fields, or if any field is empty after trimming surrounding whitespace, stop and return an error quoting what you received and naming the problem (e.g. "got 2 fields, expected 3"; "field 2 is empty").
+2. Check the destination path is a plain repo-relative path (no `..`, no absolute path outside the working tree). If not, stop and return an error.
 
 **Validate the destination against the decision tree below.** If it's clearly mis-routed (e.g. a preference about a PRM-tracked person being written to a project doc), stop and return an error naming the mismatch. The caller can re-invoke with a corrected destination.
 
 **Then:**
 
-1. Open the destination file with `Edit` (append under the given heading, creating the heading if missing). If the heading is `new file`, use `Write` to create the file with an appropriate top-level heading derived from the path. Preserve existing formatting; append-only.
+1. Decide create-vs-append based on the heading sentinel and filesystem state:
+   - If heading is the sentinel `new file`: the destination file **must not already exist**. Use `Write` to create it with an appropriate top-level heading derived from the path. If the file already exists, stop and return an error — the caller meant to append and passed the wrong heading.
+   - Otherwise: the destination file **must already exist**. Open it with `Edit` and append under the given heading, creating the heading within the file if it's missing. If the file does not exist, stop and return an error naming the missing path — do not guess whether to create it.
+   Preserve existing formatting; append-only; never rewrite unrelated content.
 2. If a very similar fact already exists in the file, stop and return a note saying so — don't dedupe silently.
-3. `git add <file> && git commit -m "remember: <one-line summary>"`. Use HEREDOC for multi-line messages. Commit summary should be specific: `remember: Alan leads Declassified project` beats `remember: add note`.
+3. `git add <file> && git commit -m "remember: <one-line summary>"`. Commit summaries are always a single line; keep them specific (`remember: Alan leads Declassified project` beats `remember: add note`).
 4. `git push -u origin <current-branch>`. Retry up to 4 times with exponential backoff (2s, 4s, 8s, 16s) on network failure. Never force-push.
 5. Return one line: what was saved, where, the commit hash. Example: `Saved to docs/projects/declassified.md and committed (a1b2c3d). Pushed.`
 
