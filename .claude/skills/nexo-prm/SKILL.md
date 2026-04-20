@@ -1,6 +1,6 @@
 ---
 name: nexo-prm
-description: Use when the user wants to read or write their personal relationship data in NexoPRM — people, moments (timestamped observations about someone), things to remember, AI reminders, relationships, lists, connection groups, linked people, working notes (plans/todos), areas of focus, meals, food log, groceries, or home items (household chores/maintenance). Also handles "debrief" — a read-only roll-up of open todos across home, groceries, and the current plan. Invoke for requests like "log that Sarah mentioned X", "who is Alex's birthday", "add milk to my groceries", "what's on my plan", "remind me that Jamie prefers texting", "debrief me", or "what are my open todos". Calls the NexoPRM Agent API at app.nexoprm.com.
+description: Use when the user wants to read or write their personal relationship data in NexoPRM — people, moments (timestamped observations about someone), things to remember, AI reminders, relationships, lists, connection groups, linked people, working notes (plans/todos), areas of focus, meals, food log, groceries, home items (household chores/maintenance), or stash (pocket knowledge base for non-person facts like products, places, gate codes). Also handles "debrief" — a read-only roll-up of open todos across home, groceries, and the current plan. Invoke for requests like "log that Sarah mentioned X", "who is Alex's birthday", "add milk to my groceries", "what's on my plan", "remind me that Jamie prefers texting", "remember that I like Reach floss", "save this cafe", "debrief me", or "what are my open todos". Calls the NexoPRM Agent API at app.nexoprm.com.
 ---
 
 # NexoPRM Agent API
@@ -125,14 +125,15 @@ Two sources: `moment` (AI-generated from a moment) and `manual` (agent-created o
 - `DELETE /api/agent/linked-people/{id}?confirm=true`
 
 ### Working notes (on-demand plans with items + headings; one level of nesting)
-`{id}` accepts a numeric id OR the literal `latest` (404 if no notes yet).
+`{id}` accepts a numeric id OR the literal `latest` (404 if no notes yet). Items with no `parent_id` and `is_heading: false` are treated as **Drafts** — brain-dump zone for todos not yet organized. Headings can carry a `notes` field for long-form project context.
 - `GET /api/agent/working-notes`
 - `POST /api/agent/working-notes` — `{ priorities_text? }`.
-- `GET /api/agent/working-notes/{id|latest}` — returns `{ working_note, items }`.
+- `GET /api/agent/working-notes/{id|latest}` — returns `{ working_note, items }`. Items include `notes` field.
 - `PATCH /api/agent/working-notes/{id|latest}` — `{ priorities_text }`.
 - `DELETE /api/agent/working-notes/{id|latest}?confirm=true`
-- `POST /api/agent/working-notes/{id|latest}/items` — `{ content, parent_id?, is_heading? }`. `parent_id` must reference a heading in the same note. `sort_order` auto-assigned.
-- `PATCH /api/agent/working-note-items/{itemId}` — writable: `content`, `checked`, `is_heading`, `sort_order`, `parent_id`.
+- `POST /api/agent/working-notes/{id|latest}/items` — `{ content, parent_id?, is_heading?, notes? }`. `parent_id` must reference a heading in the same note. `sort_order` auto-assigned. `notes` optional (typically used for headings).
+- `PUT /api/agent/working-notes/{id|latest}/reorder` — rewrite `sort_order` for every item. Body: `{ item_ids: [...] }` — full ordered list of every item id in the note.
+- `PATCH /api/agent/working-note-items/{itemId}` — writable: `content`, `checked`, `is_heading`, `sort_order`, `parent_id`, `notes`. Send `notes: null` to clear.
 - `DELETE /api/agent/working-note-items/{itemId}?confirm=true`
 
 ### Areas of focus (ongoing life themes; typically 3–5)
@@ -159,6 +160,14 @@ At most one active list per user. Creating a new list retires the old one. `{id}
 - `POST /api/agent/groceries/lists/{id|active}/items` — `{ name, note? }`.
 - `PATCH /api/agent/groceries/items/{itemId}` — writable: `name`, `note`, `checked`. Setting `checked: true` auto-sets `checked_at`; `false` clears it.
 - `DELETE /api/agent/groceries/items/{itemId}?confirm=true`
+
+### Stash
+Pocket knowledge base for non-person facts. Products, places, gate codes, stray info worth recalling. Title + optional note + optional location + tags + optional photos.
+- `GET /api/agent/stash?q=&tag=&limit=&offset=` — `q` matches title/note/location (case-insensitive). `tag` is exact-match. Ordered by `updated_at DESC`. Each row includes `photo_count`.
+- `POST /api/agent/stash` — required: `title`. Optional: `note`, `location`, `tags` (string array), `photo_urls`.
+- `GET /api/agent/stash/{id}` — detail with attached `photos`.
+- `PATCH /api/agent/stash/{id}` — writable: `title`, `note`, `location`, `tags` (replaces full array), and/or `add_photo_urls` / `remove_photo_ids`.
+- `DELETE /api/agent/stash/{id}?confirm=true` — cascades to photos.
 
 ### Home items
 Household maintenance / chores ("replace smoke alarm batteries", "regrout shower"). One implicit list per user — no parent list resource. "Open" = `done_at IS NULL`.
@@ -431,13 +440,85 @@ Trust the briefing — don't pad the output with extra calls to `/working-notes/
 
 ---
 
+### Flow E — Save a non-person fact to Stash
+
+**User:** "Remember that I like Reach floss" or "Save this cafe — they had great salads"
+
+Stash is for durable facts not tied to a person. If the user is telling you something about a specific person ("Sarah prefers texts"), use things-to-remember instead.
+
+**Step 1. Create the stash entry.**
+```bash
+curl -s -X POST "https://app.nexoprm.com/api/agent/stash" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User: $NEXO_USER" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Reach Mint Floss",
+    "note": "The thin waxed kind — glides between tight teeth better than Glide.",
+    "tags": ["health", "costco"]
+  }'
+```
+
+Expected response (201):
+```json
+{
+  "entry": {
+    "id": "47",
+    "title": "Reach Mint Floss",
+    "note": "The thin waxed kind — glides between tight teeth better than Glide.",
+    "location": null,
+    "tags": ["health", "costco"],
+    "photo_count": 0,
+    "created_at": "2026-04-20T05:20:00Z",
+    "updated_at": "2026-04-20T05:20:00Z"
+  }
+}
+```
+
+Report back with id:
+> "Saved 'Reach Mint Floss' (#47) to your stash."
+
+**With a photo (e.g. image from Telegram):**
+```bash
+curl -s -X POST "https://app.nexoprm.com/api/agent/stash" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User: $NEXO_USER" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Corner Cafe",
+    "note": "Great salads, quiet spot for working",
+    "location": "Main St & 5th",
+    "tags": ["restaurants", "work-friendly"],
+    "photo_urls": ["https://api.telegram.org/file/bot.../photo.jpg"]
+  }'
+```
+
+**Looking it up later:**
+```bash
+# Search by keyword
+curl -s "https://app.nexoprm.com/api/agent/stash?q=floss" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User: $NEXO_USER"
+
+# Filter by tag
+curl -s "https://app.nexoprm.com/api/agent/stash?tag=health" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User: $NEXO_USER"
+```
+
+---
+
 ## Other common operations (quick reference)
 
 - **Look up a birthday:** `GET /people?q=...` → `GET /people/{id}` → scan `important_dates`.
 - **Create a manual reminder:** `POST /ai-reminders` with `{ "due_at": "2026-04-25T17:00:00Z", "message_template": "Check in with Sarah", "notes": "Ask about her dad's recovery", "person_id": "42" }` (person_id and notes optional).
+- **Update a reminder's due date or message:** `PATCH /ai-reminders/{id}` with any subset of `{ "due_at": "...", "message_template": "...", "notes": "...", "person_id": "..." }`. Works for both moment-sourced and manual reminders.
 - **Mark a reminder handled:** `GET /ai-reminders?status=new` → `PATCH /ai-reminders/{id}` with `{ "status": "done" }`.
 - **Add a durable fact about someone:** resolve id → `POST /things-to-remember` with `{ person_id, content }`.
+- **Save a non-person fact:** `POST /stash` with `{ "title": "...", "note": "...", "tags": [...] }`. Use for products, places, gate codes, etc.
 - **Check off a plan item:** `GET /working-notes/latest` → find item → `PATCH /working-note-items/{id}` with `{ "checked": true }`.
+- **Add long-form notes to a heading:** `PATCH /working-note-items/{headingId}` with `{ "notes": "Long-form project context here..." }`.
+- **Promote a heading to the top:** `GET /working-notes/latest` → reorder items array (heading + children to front) → `PUT /working-notes/latest/reorder` with `{ "item_ids": [...] }`.
 - **Delete anything:** append `?confirm=true`. Only after explicit user intent. Example:
   ```bash
   curl -s -X DELETE "https://app.nexoprm.com/api/agent/moments/812?confirm=true" \
