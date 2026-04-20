@@ -130,8 +130,10 @@ Connection groups are the **only** way to link people together (couples, familie
 
 Set `role` when the user's phrasing gives a semantic hint ("link my sister's husband to her" → add him with `role: "spouse"`). Leave it `null` when ambiguous — the group's name carries the context.
 
+**Member payloads are enriched.** `GET /api/agent/connection-groups/{id}` returns members with full Person context inlined (email, phone, address, relationship, important_dates, topics, pinned_at, last_activity_at). You usually don't need a follow-up `/people/{id}` call unless you need moments, things-to-remember, or AI summary.
+
 - `GET|POST /api/agent/connection-groups` — POST body `{ name, things_to_remember, important_dates }`.
-- `GET|PATCH|DELETE /api/agent/connection-groups/{id}` — GET returns members with `role`. PATCH writable: `name`, `things_to_remember`, `important_dates`.
+- `GET|PATCH|DELETE /api/agent/connection-groups/{id}` — GET returns members with enriched Person context. PATCH writable: `name`, `things_to_remember`, `important_dates`.
 - `POST /api/agent/connection-groups/{id}/members` — `{ person_id, role?, order? }`. `role` is optional free-form string.
 - `PATCH /api/agent/connection-groups/{id}/members/{personId}` — set/clear a member's `role`. Body: `{ "role": "spouse" }` or `{ "role": null }`.
 - `DELETE /api/agent/connection-groups/{id}/members/{personId}?confirm=true`
@@ -191,6 +193,18 @@ Household maintenance / chores ("replace smoke alarm batteries", "regrout shower
 - `POST /api/agent/home-items/{id}/notes` — `{ content }`. Returns `{ note }`, 201.
 - `PATCH /api/agent/home-item-notes/{noteId}` — writable: `content`.
 - `DELETE /api/agent/home-item-notes/{noteId}?confirm=true`
+
+### Reports (read-only rollups)
+Rollup views that answer "show me everyone who matches X" without chaining multiple queries. Use when the user wants a **list**, not a briefing.
+
+- `GET /api/agent/reports/people-by-connection-type?type=primary|secondary|unset` — people filtered by `relationship.connectionType`. `unset` returns people with no connectionType yet (useful for "who haven't I categorized?"). Ordered by `last_activity_at DESC`.
+
+**Note:** More reports can easily be added. If you think a new rollup view would be helpful for the user, just ask.
+
+**Typical prompts:**
+- "Who are my primary/inner-circle people?" → `?type=primary`
+- "Who haven't I set a connection type on yet?" → `?type=unset`
+- "List my secondary connections" → `?type=secondary`
 
 ### Audit log (read-only)
 - `GET /api/agent/audit-log?userId=&since=&action=&resourceType=&limit=&offset=` — returns `{ entries: [...] }`. Bodies stored as SHA-256 digest, not raw.
