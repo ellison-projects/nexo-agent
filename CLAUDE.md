@@ -18,7 +18,7 @@ Deeper personal context — bio, goals, preferences — lives in `docs/matt/`. R
 
 The agent currently has:
 
-- **`nexo-prm` skill** (`.claude/skills/nexo-prm/`) — reads/writes my personal life data via the NexoPRM Agent API at `app.nexoprm.com`. Covers people, moments, things to remember, AI reminders, lists, connection groups, linked people, working notes / plans, areas of focus, meals, food log, groceries, and home items.
+- **`nexo-prm` skill** (`.claude/skills/nexo-prm/`) — reads/writes my personal life data via the NexoPRM Agent API at `app.nexoprm.com`. Covers people, moments, things to remember, AI reminders, lists, connection groups, linked people, working notes / plans, areas of focus, meals, food log, groceries, home items, and stash (pocket knowledge base for non-person facts like products, places, gate codes).
 - **Briefing skills** — three-way family, all snapshot to `public/briefings/` (tracked in git; the skills auto-commit and push each snapshot so history follows the repo across machines):
   - **`briefing`** (`.claude/skills/briefing/`) — generic catch-all. Canonical spec for snapshot mechanics; siblings reference it. Triggers: "brief me", "daily briefing", "catch me up".
   - **`look-ahead`** (`.claude/skills/look-ahead/`) — forward-looking, decision-first. Overdue reminders + next-7-day important dates + flagged plan items. Triggers: "what's next", "plan my day", "morning briefing".
