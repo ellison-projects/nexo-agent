@@ -49,6 +49,21 @@ The agent currently has:
 
 Additional skills will likely land here over time (calendar, email, etc.). When they do, list them in this section.
 
+## Invoking skills
+
+All six project skills above run with `context: fork` — their SKILL.md bodies execute in an isolated subagent that **has no access to this conversation**. That means:
+
+- The fork can't see pronouns or back-references ("add that to groceries", "yes, do it"). Resolve those in the main thread first.
+- Pass a complete, self-contained task string as the skill argument. The fork's prompt is `SKILL.md` content + the args you send — that's all.
+- The fork can't ask Matt follow-up questions. If something is ambiguous, clarify in the main thread before invoking.
+- The fork returns a summary to the main thread; continue the conversation from there.
+
+**Skill-specific notes:**
+
+- **`nexo-prm`** — pass the full intent, e.g. `Add 'Coke Zero 12-pack' to Matt's grocery list`, not `add coke`.
+- **`remember`** — two-phase: first, in the main thread, clean up the wording and pick the destination per the decision tree in the skill body (or ask Matt), and confirm both with him. Then invoke with a pipe-delimited arg: `<cleaned fact> | <destination path> | <heading or "new file">`. The fork only writes + commits + pushes.
+- **Briefing family + refresh-api-docs** — args are optional; pass emphasis/focus/window-selection if Matt specified one, otherwise invoke with no args for default behavior.
+
 ## Commands
 
 - `npm run dev` — run the agent locally with `tsx` and `.env` loaded. No build step; TypeScript runs directly.
