@@ -1,6 +1,6 @@
 ---
 name: nexo-prm
-description: Use when the user wants to read or write their personal relationship data in NexoPRM — people, moments (timestamped observations about someone), things to remember, AI reminders, relationships, lists, connection groups, linked people, working notes (plans/todos), areas of focus, meals, food log, groceries, home items (household chores/maintenance), or stash (pocket knowledge base for non-person facts like products, places, gate codes). Also handles "debrief" — a read-only roll-up of open todos across home, groceries, and the current plan. Invoke for requests like "log that Sarah mentioned X", "who is Alex's birthday", "add milk to my groceries", "what's on my plan", "remind me that Jamie prefers texting", "remember that I like Reach floss", "save this cafe", "debrief me", or "what are my open todos". Calls the NexoPRM Agent API at app.nexoprm.com. Runs in a forked subagent — when invoking, pass the user's full intent as the argument (e.g. `Add 'Coke Zero 12-pack' to Matt's grocery list`), since this skill has no access to conversation history.
+description: Use when the user wants to read or write their personal relationship data in NexoPRM — people, moments (timestamped observations about someone), things to remember, AI reminders, relationships, lists, connection groups (the way to link people together), working notes (plans/todos), areas of focus, meals, food log, groceries, home items (household chores/maintenance), or stash (pocket knowledge base for non-person facts like products, places, gate codes). Also handles "debrief" — a read-only roll-up of open todos across home, groceries, and the current plan. Invoke for requests like "log that Sarah mentioned X", "who is Alex's birthday", "add milk to my groceries", "what's on my plan", "link Sam to John", "remind me that Jamie prefers texting", "remember that I like Reach floss", "save this cafe", "debrief me", or "what are my open todos". Calls the NexoPRM Agent API at app.nexoprm.com. Runs in a forked subagent — when invoking, pass the user's full intent as the argument (e.g. `Add 'Coke Zero 12-pack' to Matt's grocery list`), since this skill has no access to conversation history.
 context: fork
 ---
 
@@ -86,7 +86,7 @@ Read-only roll-up of the user's whole state. Use for open-ended prompts ("debrie
 ### People
 - `GET /api/agent/people?q=&limit=&offset=` — search by name/email/phone substring.
 - `POST /api/agent/people` — only `name` required. Other fields: `email`, `phone`, `address`, `important_dates` (array of `{label, date, recurring}`), `relationship` (`{connectionType}`), `topics` (string array), `pinned_at`.
-- `GET /api/agent/people/{id}` — full detail: moments, things_to_remember, linked_people, lists, connection_groups, ai_summary.
+- `GET /api/agent/people/{id}` — **THE endpoint for learning everything about a person in one call.** Returns `person` + `moments` (up to 100, each with `images`) + `things_to_remember` + `lists` + `connection_groups` + `relationships` (couple/family groups) + `saved_articles` + `ai_reminders` (up to 100, all statuses) + `ai_summary`. Use this for "what do I know about X" or "catch me up on Sarah" queries.
 - `PATCH /api/agent/people/{id}` — writable: `name`, `email`, `phone`, `address`, `important_dates`, `reminder`, `relationship`, `topics`, `pinned_at`.
 - `DELETE /api/agent/people/{id}?confirm=true` — cascades.
 
@@ -122,16 +122,19 @@ Two sources: `moment` (AI-generated from a moment) and `manual` (agent-created o
 - `DELETE /api/agent/lists/{id}/members/{personId}?confirm=true`
 
 ### Connection groups
-- `GET|POST /api/agent/connection-groups` — POST body `{ name, things_to_remember, important_dates }`.
-- `GET|PATCH|DELETE /api/agent/connection-groups/{id}` — PATCH writable: `name`, `things_to_remember`, `important_dates`.
-- `POST /api/agent/connection-groups/{id}/members` — `{ person_id, order }`.
-- `DELETE /api/agent/connection-groups/{id}/members/{personId}?confirm=true`
+Connection groups are the **only** way to link people together (couples, families, teams, friend circles). When the user says "link Sam to John" or "link Eli's friend Jake", find an existing group or create one and add both members. Each member can carry an optional `role` ("spouse", "child", "parent", "sibling", etc.) describing their position in that group.
 
-### Linked people (one-directional edges)
-- `GET /api/agent/linked-people?personId=`
-- `POST /api/agent/linked-people` — `{ person_id, linked_person_id, description }`. Both people must belong to the impersonated user.
-- `PATCH /api/agent/linked-people/{id}` — `{ description }`.
-- `DELETE /api/agent/linked-people/{id}?confirm=true`
+**Two different concepts:**
+- `person.relationship.label` — "Who is Sam to the user?" (e.g. "sister", "best friend", "boss")
+- `connection_group_members.role` — "Who is Sam within **this** group?" (e.g. "spouse" in her couple group, "sibling" in the family group)
+
+Set `role` when the user's phrasing gives a semantic hint ("link my sister's husband to her" → add him with `role: "spouse"`). Leave it `null` when ambiguous — the group's name carries the context.
+
+- `GET|POST /api/agent/connection-groups` — POST body `{ name, things_to_remember, important_dates }`.
+- `GET|PATCH|DELETE /api/agent/connection-groups/{id}` — GET returns members with `role`. PATCH writable: `name`, `things_to_remember`, `important_dates`.
+- `POST /api/agent/connection-groups/{id}/members` — `{ person_id, role?, order? }`. `role` is optional free-form string.
+- `PATCH /api/agent/connection-groups/{id}/members/{personId}` — set/clear a member's `role`. Body: `{ "role": "spouse" }` or `{ "role": null }`.
+- `DELETE /api/agent/connection-groups/{id}/members/{personId}?confirm=true`
 
 ### Working notes (on-demand plans with items + headings; one level of nesting)
 `{id}` accepts a numeric id OR the literal `latest` (404 if no notes yet). Items with no `parent_id` and `is_heading: false` are treated as **Drafts** — brain-dump zone for todos not yet organized. Headings can carry a `notes` field for long-form project context.
@@ -517,9 +520,85 @@ curl -s "https://app.nexoprm.com/api/agent/stash?tag=health" \
 
 ---
 
+### Flow F — Link two people together
+
+**User:** "Link Sam to John" or "Link my sister's husband to her" or "Link Eli's friend Jake"
+
+Connection groups are the only way to link people. Flow: resolve both people → find existing group or create one → add members with optional roles.
+
+**Step 1. Resolve both people.**
+```bash
+curl -s "https://app.nexoprm.com/api/agent/people?q=sam" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User: $NEXO_USER"
+
+curl -s "https://app.nexoprm.com/api/agent/people?q=john" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User: $NEXO_USER"
+```
+
+Disambiguate if needed (see Flow A).
+
+**Step 2. Find an existing group or create one.**
+```bash
+# List existing groups
+curl -s "https://app.nexoprm.com/api/agent/connection-groups" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User: $NEXO_USER"
+```
+
+Scan for a group that already contains one of them or obviously fits (a couple group, "Eli's friends", etc.).
+
+**If a group fits:**
+```bash
+# Add the other person with optional role
+curl -s -X POST "https://app.nexoprm.com/api/agent/connection-groups/42/members" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User: $NEXO_USER" \
+  -H "Content-Type: application/json" \
+  -d '{"person_id":"88","role":"spouse"}'
+```
+
+**If no group fits, create one:**
+```bash
+# Create group
+curl -s -X POST "https://app.nexoprm.com/api/agent/connection-groups" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User: $NEXO_USER" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Sam & John"}'
+
+# Add both members
+curl -s -X POST "https://app.nexoprm.com/api/agent/connection-groups/57/members" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User: $NEXO_USER" \
+  -H "Content-Type: application/json" \
+  -d '{"person_id":"42","role":"spouse"}'
+
+curl -s -X POST "https://app.nexoprm.com/api/agent/connection-groups/57/members" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User: $NEXO_USER" \
+  -H "Content-Type: application/json" \
+  -d '{"person_id":"88","role":"spouse"}'
+```
+
+**Role hints from natural language:**
+- "her husband" / "his wife" → `"spouse"`
+- "Eli's friend" → leave `role` null (group name "Eli's friends" says it)
+- "my sister's son" → `"child"` (in a parents group) or `"nephew"` depending on context
+- When in doubt, leave `role` null
+
+Report back:
+> "Added John (#88) to Sam & John group (#57) as spouse."
+
+---
+
 ## Other common operations (quick reference)
 
+- **"What do I know about Sarah?"** → `GET /people?q=sarah` to resolve id, then `GET /people/{id}` — returns everything (moments, things-to-remember, reminders, lists, groups, relationships, articles, ai_summary) in one call.
 - **Look up a birthday:** `GET /people?q=...` → `GET /people/{id}` → scan `important_dates`.
+- **Link two people:** resolve both ids → `GET /connection-groups` to find existing group or `POST /connection-groups` to create → `POST /connection-groups/{id}/members` with `{ person_id, role? }` for each. See Flow F.
+- **Set/update a member's role in a group:** `PATCH /connection-groups/{groupId}/members/{personId}` with `{ "role": "spouse" }` or `{ "role": null }` to clear.
 - **Create a manual reminder:** `POST /ai-reminders` with `{ "due_at": "2026-04-25T17:00:00Z", "message_template": "Check in with Sarah", "notes": "Ask about her dad's recovery", "person_id": "42" }` (person_id and notes optional).
 - **Update a reminder's due date or message:** `PATCH /ai-reminders/{id}` with any subset of `{ "due_at": "...", "message_template": "...", "notes": "...", "person_id": "..." }`. Works for both moment-sourced and manual reminders.
 - **Mark a reminder handled:** `GET /ai-reminders?status=new` → `PATCH /ai-reminders/{id}` with `{ "status": "done" }`.
