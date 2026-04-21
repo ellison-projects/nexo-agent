@@ -116,6 +116,8 @@ Two sources: `moment` (AI-generated from a moment) and `manual` (agent-created o
 - `DELETE /api/agent/relationships/{id}/members/{personId}?confirm=true`
 
 ### Lists
+Lightweight named rosters for action. Use lists for scanning/filtering (e.g. "Active babysitters", "Christmas cards", "People to invite to barbecue"). No shared notes, no shared dates, no per-member roles. If the collection would benefit from shared context, use a connection group instead.
+
 - `GET|POST /api/agent/lists` — POST body `{ name, pinned_at }`.
 - `GET|PATCH|DELETE /api/agent/lists/{id}` — PATCH writable: `name`, `pinned_at`.
 - `POST /api/agent/lists/{id}/members` — `{ person_id }`.
@@ -123,6 +125,8 @@ Two sources: `moment` (AI-generated from a moment) and `manual` (agent-created o
 
 ### Connection groups
 Connection groups are the **only** way to link people together (couples, families, teams, friend circles). When the user says "link Sam to John" or "link Eli's friend Jake", find an existing group or create one and add both members. Each member can carry an optional `role` ("spouse", "child", "parent", "sibling", etc.) describing their position in that group.
+
+**Groups vs Lists** — both collect people but solve different jobs. Use a group when the collection has shared memory: shared `things_to_remember`, shared `important_dates`, or per-member `role`. Families, couples, and teams belong here. Use a list only for pure action rosters (scanning/filtering). Quick test: "If I could attach one shared note to this whole collection, would that make sense?" Yes → group. No → list.
 
 **Two different concepts:**
 - `person.relationship.label` — "Who is Sam to the user?" (e.g. "sister", "best friend", "boss")
@@ -132,8 +136,8 @@ Set `role` when the user's phrasing gives a semantic hint ("link my sister's hus
 
 **Member payloads are enriched.** `GET /api/agent/connection-groups/{id}` returns members with full Person context inlined (email, phone, address, relationship, important_dates, topics, pinned_at, last_activity_at). You usually don't need a follow-up `/people/{id}` call unless you need moments, things-to-remember, or AI summary.
 
-- `GET|POST /api/agent/connection-groups` — POST body `{ name, things_to_remember, important_dates }`.
-- `GET|PATCH|DELETE /api/agent/connection-groups/{id}` — GET returns members with enriched Person context. PATCH writable: `name`, `things_to_remember`, `important_dates`.
+- `GET|POST /api/agent/connection-groups` — GET returns groups sorted pinned-first, then by `updated_at`. POST body `{ name, things_to_remember, important_dates }`.
+- `GET|PATCH|DELETE /api/agent/connection-groups/{id}` — GET returns members with enriched Person context. PATCH writable: `name`, `things_to_remember`, `important_dates`, `pinned_at` (ISO timestamp to pin, `null` to unpin).
 - `POST /api/agent/connection-groups/{id}/members` — `{ person_id, role?, order? }`. `role` is optional free-form string.
 - `PATCH /api/agent/connection-groups/{id}/members/{personId}` — set/clear a member's `role`. Body: `{ "role": "spouse" }` or `{ "role": null }`.
 - `DELETE /api/agent/connection-groups/{id}/members/{personId}?confirm=true`
