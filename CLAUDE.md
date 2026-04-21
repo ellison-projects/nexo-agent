@@ -27,6 +27,7 @@ The agent currently has:
 - **Briefing endpoint** (`GET /api/agent/briefing`) — a one-call read-only roll-up of my open todos, plan items, reminders, recent moments, pinned people, etc. Used by the briefing-family skills. Not pre-fetched — the agent decides when to call it.
 - **`remember` skill** (`.claude/skills/remember/`) — turns casual "remember X" requests into durable notes committed into the repo. Routes facts to the right file under `docs/` (project docs, `docs/matt/*`, or `CLAUDE.md`), confirms wording and destination, then commits and pushes. For facts about a person already in PRM, it defers to `nexo-prm` instead.
 - **`refresh-api-docs` skill** (`.claude/skills/refresh-api-docs/`) — pulls the latest `llm.md` reference and `features.md` summary from `app.nexoprm.com`, writes timestamped snapshots to `docs/api-snapshots/`, updates the unsuffixed aliases, diffs against the prior snapshot, summarizes the changes, and auto-commits/pushes. Triggers on "refresh the api docs", "snapshot the api", etc.
+- **`telegram-reminder` skill** (`.claude/skills/telegram-reminder/`) — schedules a one-shot Telegram message via the local `at` daemon. **Narrow override** — triggers ONLY when I explicitly name Telegram as the delivery channel ("remind me with telegram in 10 min to X", "telegram me at 3pm about Y"). Every other reminder phrasing routes to `nexo-prm` (PRM's AI reminders are the default reminder system). Runs inline (not forked) since it's a single shell command. Uses `at`'s heredoc form to bake `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` into the spool script at scheduling time, then `curl`s the Telegram Bot API when the job fires. Also handles `atq` / `atrm` for listing and cancelling. Short-term only (minutes to hours); multi-day reminders defer to `nexo-prm`. One-time host setup: `sudo dnf install -y at && sudo systemctl enable --now atd`.
 - **Standard Claude Code tools** — Read/Glob/Grep/Bash/etc. via the `claude_code` preset. Available for any task that calls for them — codebase work, shell commands, research, etc.
 - **Send files back via Telegram** — `npm run send-file -- <path> [caption...]` (wraps `scripts/send-file.ts`, which calls `sendDocument` in `src/telegram.ts`). Use this when Matt asks for an export — a list of recurring tasks, a CSV, a long report, etc. Flow: generate the content → write it to a `/tmp/*.{txt,csv,json,pdf}` file → run the npm command → confirm in the reply. Default to this over inline text when the output is long, structured, or meant to be saved. For quick reads that fit in a message, just reply normally.
   - **File format guide** (Telegram's in-app preview varies by type — pick the one that reads best):
@@ -51,7 +52,7 @@ Additional skills will likely land here over time (calendar, email, etc.). When 
 
 ## Invoking skills
 
-All six project skills above run with `context: fork` — their SKILL.md bodies execute in an isolated subagent that **has no access to this conversation**. That means:
+The six fork-context project skills above (`nexo-prm`, `briefing`, `look-ahead`, `look-back`, `remember`, `refresh-api-docs`) run with `context: fork` — their SKILL.md bodies execute in an isolated subagent that **has no access to this conversation**. That means:
 
 - The fork can't see pronouns or back-references ("add that to groceries", "yes, do it"). Resolve those in the main thread first.
 - Pass a complete, self-contained task string as the skill argument. The fork's prompt is `SKILL.md` content + the args you send — that's all.
@@ -63,6 +64,7 @@ All six project skills above run with `context: fork` — their SKILL.md bodies 
 - **`nexo-prm`** — pass the full intent, e.g. `Add 'Coke Zero 12-pack' to Matt's grocery list`, not `add coke`.
 - **`remember`** — two-phase: first, in the main thread, clean up the wording and pick the destination per the decision tree in the skill body (or ask Matt), and confirm both with him. Then invoke with a pipe-delimited arg of the form `<cleaned fact> | <destination path> | <heading>`. `<heading>` is either an existing/desired heading in the file (e.g. `## People`) or the exact sentinel `new file` (unquoted, lowercase) to create the destination. The `|` character is reserved — it must not appear inside any field. The fork only writes + commits + pushes.
 - **Briefing family + refresh-api-docs** — args are optional; pass emphasis/focus/window-selection if Matt specified one, otherwise invoke with no args for default behavior.
+- **`telegram-reminder`** runs **inline**, not forked — it has full conversation context, so it can resolve pronouns/back-references itself. Reminder skill bodies are read by the main agent and executed directly; no handoff to a subagent.
 
 ## Commands
 
