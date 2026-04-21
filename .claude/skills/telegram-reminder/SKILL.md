@@ -36,11 +36,11 @@ Sanity-check with `systemctl is-active atd` before scheduling if you suspect the
 
 1. **Parse Matt's intent into two pieces:**
    - **Time spec** — anything `at` accepts. Common forms: `now + 10 minutes`, `now + 1 hour`, `now + 2 hours`, `15:30`, `3pm`, `tomorrow 09:00`, `4pm tomorrow`.
-   - **Message** — the text to push. Clean it up per the "improve my wording" rules in `CLAUDE.md` — don't parrot back "take laundry out", write *"Take the laundry out of the dryer"*. A leading emoji is nice when it fits the content (🧺 laundry, 🍳 oven, 💊 meds, 📞 call). Don't overdo it.
+   - **Message** — the text to push. Clean it up per the "improve my wording" rules in `CLAUDE.md` — don't parrot back "take laundry out", write *"Take the laundry out of the dryer"*. **Always prefix with `⏰` to indicate it's a scheduled message.** Then add a content-specific emoji when it fits (🧺 laundry, 🍳 oven, 💊 meds, 📞 call). Don't overdo it.
 
 2. **Confirm with Matt before scheduling.** Show him the parsed time and the final message text so he can catch misinterpretations. Example:
 
-   > I'll schedule a Telegram reminder for 3:40pm (10 min from now): *"🧺 Take the laundry out of the dryer"*. Good?
+   > I'll schedule a Telegram reminder for 3:40pm (10 min from now): *"⏰ 🧺 Take the laundry out of the dryer"*. Good?
 
    If he corrects either piece, adjust and re-confirm. If the original phrasing was unambiguous and short, a single line confirm-as-you-schedule is fine — use judgment.
 
@@ -50,7 +50,7 @@ Sanity-check with `systemctl is-active atd` before scheduling if you suspect the
    at now + 10 minutes <<EOF
    curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \\
      -d "chat_id=${TELEGRAM_CHAT_ID}" \\
-     --data-urlencode "text=🧺 Take the laundry out of the dryer"
+     --data-urlencode "text=⏰ 🧺 Take the laundry out of the dryer"
    EOF
    ```
 
@@ -61,7 +61,7 @@ Sanity-check with `systemctl is-active atd` before scheduling if you suspect the
 
 4. **Report back.** `at` writes the scheduled job line to stderr: `job 5 at 2026-04-21 15:40`. Capture it and tell Matt the job number and scheduled time, so he can cancel later if needed. Example:
 
-   > Scheduled Telegram reminder #5 for 3:40pm: *"🧺 Take the laundry out of the dryer"*. Use `atq` to list pending or `atrm 5` to cancel.
+   > Scheduled Telegram reminder #5 for 3:40pm: *"⏰ 🧺 Take the laundry out of the dryer"*. Use `atq` to list pending or `atrm 5` to cancel.
 
    If `at` fails (daemon down, bad time spec), report the error verbatim and stop.
 
