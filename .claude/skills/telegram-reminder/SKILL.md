@@ -59,9 +59,9 @@ Sanity-check with `systemctl is-active atd` before scheduling if you suspect the
    - Keep the message inside the `text=` double quotes. If the message itself contains a literal `"` or backtick or `$`, escape it with `\` inside the heredoc, or (cleaner) set `MSG="..."` first with careful quoting and use `--data-urlencode "text=${MSG}"`.
    - Don't add `&& echo` or other extras — keep the job a single curl so it's easy to read via `at -c <n>`.
 
-4. **Report back.** `at` writes the scheduled job line to stderr: `job 5 at 2026-04-21 15:40`. Capture it and tell Matt the job number and scheduled time, so he can cancel later if needed. Example:
+4. **Report back.** `at` writes the scheduled job line to stderr: `job 5 at 2026-04-21 15:40`. Capture it and tell Matt the job number and scheduled time. Example:
 
-   > Scheduled Telegram reminder #5 for 3:40pm: *"⏰ 🧺 Take the laundry out of the dryer"*. Use `atq` to list pending or `atrm 5` to cancel.
+   > Scheduled Telegram reminder #5 for 3:40pm: *"⏰ 🧺 Take the laundry out of the dryer"*.
 
    If `at` fails (daemon down, bad time spec), report the error verbatim and stop.
 
