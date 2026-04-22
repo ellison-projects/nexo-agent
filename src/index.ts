@@ -1,7 +1,7 @@
 import { unlink } from 'node:fs/promises';
 import { execSync } from 'node:child_process';
 import { env } from './env';
-import { fetchPhoto, editMessage, getUpdates, sendMessage, type TelegramUpdate } from './telegram';
+import { fetchPhoto, editMessage, getUpdates, sendMessage, sendReminderBotMessage, type TelegramUpdate } from './telegram';
 import { askNexo } from './ai';
 
 type QueuedMessage = {
@@ -63,7 +63,9 @@ async function poll(): Promise<void> {
       let offset = await skipBacklog();
       console.log(`Nexo listening for Telegram messages from chat ${env.telegramChatId}...`);
       const gitReport = gitStartupReport();
-      await sendMessage(Number(env.telegramChatId), `Nexo online 🚀\n\n${gitReport}`).catch(() => {});
+      const startupText = `Nexo online 🚀\n\n${gitReport}`;
+      await sendMessage(Number(env.telegramChatId), startupText).catch(() => {});
+      await sendReminderBotMessage(Number(env.telegramChatId), `[reminder bot] ${startupText}`).catch(() => {});
 
       while (true) {
             try {

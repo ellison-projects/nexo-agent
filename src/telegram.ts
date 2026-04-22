@@ -85,6 +85,17 @@ export async function sendMessage(chatId: number, text: string): Promise<number>
       return data.result.message_id;
 }
 
+export async function sendReminderBotMessage(chatId: number, text: string): Promise<number> {
+      const res = await fetch(`https://api.telegram.org/bot${env.telegramReminderBotToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, text }),
+      });
+      if (!res.ok) throw new Error(`Telegram reminder sendMessage failed: ${res.status} ${await res.text()}`);
+      const data = (await res.json()) as { ok: boolean; result: { message_id: number } };
+      return data.result.message_id;
+}
+
 export async function editMessage(chatId: number, messageId: number, text: string): Promise<void> {
       await postMessage('editMessageText', { chat_id: chatId, message_id: messageId }, text);
 }
