@@ -170,13 +170,16 @@ Set `role` when the user's phrasing gives a semantic hint ("link my sister's hus
 
 ### Groceries
 At most one active list per user. Creating a new list retires the old one. `{id}` accepts numeric id OR `active` (404 if none).
+
+**IMPORTANT: Always search Stash first before adding grocery items.** Use `GET /stash?tag=grocery&q=<item>` to check for existing curated product entries. If a match exists, pass only `stash_id` (server copies stash title to name). This preserves brand preferences.
+
 - `GET /api/agent/groceries/lists` — all lists with `item_count`, `unchecked_count`.
 - `POST /api/agent/groceries/lists` — `{ name? }`. Creates new active list.
-- `GET /api/agent/groceries/lists/{id|active}` — returns `{ grocery_list, items }`.
+- `GET /api/agent/groceries/lists/{id|active}` — returns `{ grocery_list, items }`. Items include `stash_id` if linked.
 - `PATCH /api/agent/groceries/lists/{id|active}` — writable: `name`, `active`.
 - `DELETE /api/agent/groceries/lists/{id|active}?confirm=true`
-- `POST /api/agent/groceries/lists/{id|active}/items` — `{ name, note? }`.
-- `PATCH /api/agent/groceries/items/{itemId}` — writable: `name`, `note`, `checked`. Setting `checked: true` auto-sets `checked_at`; `false` clears it.
+- `POST /api/agent/groceries/lists/{id|active}/items` — requires `name` OR `stash_id`. If `stash_id` provided, omit `name` (server fills from stash title). Optional: `note`, `photo_urls`.
+- `PATCH /api/agent/groceries/items/{itemId}` — writable: `name`, `note`, `checked`. `stash_id` is immutable. Setting `checked: true` auto-sets `checked_at`; `false` clears it.
 - `DELETE /api/agent/groceries/items/{itemId}?confirm=true`
 
 ### Stash
@@ -304,8 +307,28 @@ Expected response (201):
 
 **User:** "Add milk to my groceries."
 
-**Step 1. Try adding to the active list directly.**
+**Step 1. Search Stash first (ALWAYS do this).**
 ```bash
+curl -s "https://app.nexoprm.com/api/agent/stash?tag=grocery&q=milk" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User: $NEXO_USER"
+```
+
+**If match found:**
+```bash
+# Use stash_id, omit name
+curl -s -X POST "https://app.nexoprm.com/api/agent/groceries/lists/active/items" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User: $NEXO_USER" \
+  -H "Content-Type: application/json" \
+  -d '{"stash_id":"42"}'
+```
+
+Response will include the stash title as `name`.
+
+**If no match:**
+```bash
+# Use name only
 curl -s -X POST "https://app.nexoprm.com/api/agent/groceries/lists/active/items" \
   -H "Authorization: Bearer $NEXO_API_KEY" \
   -H "X-Nexo-User: $NEXO_USER" \
@@ -322,7 +345,8 @@ Expected response (201):
     "name": "milk",
     "note": null,
     "checked": false,
-    "checked_at": null
+    "checked_at": null,
+    "stash_id": null
   }
 }
 ```
@@ -617,6 +641,7 @@ Report back:
 - **Look up a birthday:** `GET /people?q=...` → `GET /people/{id}` → scan `important_dates`.
 - **Link two people:** resolve both ids → `GET /connection-groups` to find existing group or `POST /connection-groups` to create → `POST /connection-groups/{id}/members` with `{ person_id, role? }` for each. See Flow F.
 - **Set/update a member's role in a group:** `PATCH /connection-groups/{groupId}/members/{personId}` with `{ "role": "spouse" }` or `{ "role": null }` to clear.
+- **Add grocery item:** ALWAYS search stash first with `GET /stash?tag=grocery&q=<item>`. If match found, `POST /groceries/lists/active/items` with `{ "stash_id": "..." }` (omit name). If no match, use `{ "name": "..." }`. See Flow B.
 - **Create a manual reminder:** `POST /ai-reminders` with `{ "due_at": "2026-04-25T17:00:00Z", "message_template": "Check in with Sarah", "notes": "Ask about her dad's recovery", "person_id": "42" }` (person_id and notes optional).
 - **Update a reminder's due date or message:** `PATCH /ai-reminders/{id}` with any subset of `{ "due_at": "...", "message_template": "...", "notes": "...", "person_id": "..." }`. Works for both moment-sourced and manual reminders.
 - **Mark a reminder handled:** `GET /ai-reminders?status=new` → `PATCH /ai-reminders/{id}` with `{ "status": "done" }`.
