@@ -28,7 +28,7 @@ When in doubt, use `nexo-prm`. Telegram-via-`at` is the narrow override; PRM is 
 ## Prerequisites
 
 - `at` installed and `atd` running on this box (one-time: `sudo dnf install -y at && sudo systemctl enable --now atd`).
-- Env vars `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` set — same ones the agent already uses (from `.env`).
+- Env vars `TELEGRAM_REMINDER_BOT_TOKEN` and `TELEGRAM_CHAT_ID` set — dedicated reminder bot credentials (from `.env`).
 
 Sanity-check with `systemctl is-active atd` before scheduling if you suspect the daemon is down. If it's not running, tell Matt and stop — don't silently fail.
 
@@ -48,14 +48,14 @@ Sanity-check with `systemctl is-active atd` before scheduling if you suspect the
 
    ```bash
    at now + 10 minutes <<EOF
-   curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \\
+   curl -s "https://api.telegram.org/bot${TELEGRAM_REMINDER_BOT_TOKEN}/sendMessage" \\
      -d "chat_id=${TELEGRAM_CHAT_ID}" \\
      --data-urlencode "text=⏰ 🧺 Take the laundry out of the dryer"
    EOF
    ```
 
    Notes on escaping:
-   - The outer heredoc is unquoted (`<<EOF`, not `<<'EOF'`) so `${TELEGRAM_BOT_TOKEN}` and `${TELEGRAM_CHAT_ID}` expand now, not at at-run time.
+   - The outer heredoc is unquoted (`<<EOF`, not `<<'EOF'`) so `${TELEGRAM_REMINDER_BOT_TOKEN}` and `${TELEGRAM_CHAT_ID}` expand now, not at at-run time.
    - Keep the message inside the `text=` double quotes. If the message itself contains a literal `"` or backtick or `$`, escape it with `\` inside the heredoc, or (cleaner) set `MSG="..."` first with careful quoting and use `--data-urlencode "text=${MSG}"`.
    - Don't add `&& echo` or other extras — keep the job a single curl so it's easy to read via `at -c <n>`.
 
