@@ -500,7 +500,29 @@ Trust the briefing — don't pad the output with extra calls to `/working-notes/
 
 Stash is for durable facts not tied to a person. If the user is telling you something about a specific person ("Sarah prefers texts"), use things-to-remember instead.
 
-**Step 1. Create the stash entry.**
+**IMPORTANT: Always confirm before creating a stash entry.** Parse the item, propose the title and notes using the template below, and wait for Matt to confirm.
+
+**Template format:**
+```
+Title: {brief title like "Turkey Bites"}
+Notes: {full product name if available, plus where the item can be purchased from}
+```
+
+If you don't know where the item can be purchased, ask Matt.
+
+**Step 1. Propose the entry and wait for confirmation.**
+
+Example:
+> "I'll add this to your Stash:
+>
+> **Title:** Reach Mint Floss
+> **Notes:** Reach Mint Floss (thin waxed kind) — available at Costco
+>
+> Look good?"
+
+Wait for Matt to confirm before proceeding to step 2.
+
+**Step 2. Create the stash entry.**
 ```bash
 curl -s -X POST "https://app.nexoprm.com/api/agent/stash" \
   -H "Authorization: Bearer $NEXO_API_KEY" \
