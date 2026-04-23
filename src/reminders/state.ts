@@ -1,4 +1,4 @@
-// Persistent map of {uid::occurrenceIso → atJobId + metadata}. Survives
+// Persistent map of {uid::occurrenceTs → atJobId + metadata}. Survives
 // process restarts so the reconciler can cancel at-jobs for reminders that
 // disappeared from the feed. Written atomically via a temp-file rename so a
 // crash mid-write can't leave a half-written JSON on disk.

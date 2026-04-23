@@ -3,6 +3,8 @@
 // emits. Deliberately not a general-purpose RFC 5545 implementation — if the
 // feed grows beyond what's handled here, extend alongside it.
 
+import { wallClockToUtc } from './zone';
+
 export interface VEvent {
       uid: string;
       summary: string;
@@ -85,46 +87,14 @@ function parseDtStart(line: string): { date: Date; isAllDay: boolean; tzid?: str
       }
 
       if (tzid) {
-            // Local wall-clock in the given zone. Compute the UTC instant by
-            // asking Intl for the zone's offset at that moment.
-            return { date: zonedWallClockToUtc(Number(y), Number(mo), Number(d), Number(h), Number(mi), Number(s), tzid), isAllDay: false, tzid };
+            // Local wall-clock in the given zone. Convert via the shared
+            // zone helper. Month goes 0-indexed for the Date.UTC convention.
+            return { date: wallClockToUtc(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s), tzid), isAllDay: false, tzid };
       }
 
       // Floating time — treat as UTC. The feed doesn't emit floating times
       // for anything we care about, so this branch is a safety net only.
       return { date: new Date(`${y}-${mo}-${d}T${h}:${mi}:${s}Z`), isAllDay: false };
-}
-
-/** Given a wall-clock moment in a named IANA zone, return the corresponding
- * UTC instant. Works by computing the zone's offset at that wall-clock time
- * and applying it. Handles DST by iterating once if the first guess lands
- * inside a transition. */
-function zonedWallClockToUtc(y: number, mo: number, d: number, h: number, mi: number, s: number, tzid: string): Date {
-      // First guess: treat the wall-clock as if it were UTC.
-      const guess = Date.UTC(y, mo - 1, d, h, mi, s);
-      const offset1 = zoneOffsetMinutes(new Date(guess), tzid);
-      const refined = guess - offset1 * 60_000;
-      // Refine once in case we crossed a DST boundary.
-      const offset2 = zoneOffsetMinutes(new Date(refined), tzid);
-      return new Date(guess - offset2 * 60_000);
-}
-
-/** Return the offset (in minutes east of UTC) for the given instant in the
- * given IANA zone. E.g. America/Chicago in summer → -300 (CDT). */
-function zoneOffsetMinutes(instant: Date, tzid: string): number {
-      const parts = new Intl.DateTimeFormat('en-US', {
-            timeZone: tzid,
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false,
-      }).formatToParts(instant);
-      const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
-      const asUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour') % 24, get('minute'), get('second'));
-      return Math.round((asUtc - instant.getTime()) / 60_000);
 }
 
 /** Unescape the four sequences iCalendar text values use (RFC 5545 §3.3.11). */

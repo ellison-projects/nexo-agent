@@ -61,8 +61,25 @@ async function main(): Promise<void> {
 
       console.log(`nexo-reminders starting (poll every ${POLL_INTERVAL_MS / 1000}s, horizon ${HORIZON_MS / 3_600_000}h)`);
 
-      await tick(feedUrl);
-      setInterval(() => { void tick(feedUrl); }, POLL_INTERVAL_MS);
+      // Guard against overlap — if a tick runs long (network stall, `at`
+      // latency), skip the next scheduled fire rather than racing the
+      // previous one on `data/reminders-state.json`.
+      let running = false;
+      const safeTick = async (): Promise<void> => {
+            if (running) {
+                  console.warn('[tick] previous run still in progress; skipping this interval');
+                  return;
+            }
+            running = true;
+            try {
+                  await tick(feedUrl);
+            } finally {
+                  running = false;
+            }
+      };
+
+      await safeTick();
+      setInterval(() => { void safeTick(); }, POLL_INTERVAL_MS);
 }
 
 void main();
