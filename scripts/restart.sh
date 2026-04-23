@@ -41,6 +41,7 @@ notify "🔄 Restarting Nexo..."
 # pm2 versions.
 pm2 delete nexo-agent >/dev/null 2>&1 || true
 pm2 delete nexo-web >/dev/null 2>&1 || true
+pm2 delete nexo-reminders >/dev/null 2>&1 || true
 
 notify "🧹 Old apps cleared, booting fresh..."
 
