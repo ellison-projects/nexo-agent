@@ -1,6 +1,6 @@
 // Ecosystem for the debug agent only. Kept in its own file so the main
-// lifecycle commands (`npm start`, `npm run restart`, `npm run cleanup`,
-// `pm2 start ecosystem.config.cjs`) never touch it. Start explicitly with
+// lifecycle commands (`npm start`, `npm run restart`, `pm2 start
+// ecosystem.config.cjs`) never touch it. Start explicitly with
 // `npm run start:debug` or `pm2 start ecosystem.debug.config.cjs`.
 module.exports = {
       apps: [

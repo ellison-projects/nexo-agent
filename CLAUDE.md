@@ -73,7 +73,6 @@ The six fork-context project skills above (`nexo-prm`, `briefing`, `look-ahead`,
 - `npm run restart` — runs `scripts/restart.sh`: `pm2 delete`s both apps by name (so pm2's autorestart can't fire while we're cleaning up), then `pm2 start`s fresh. The everyday bounce — preserves Claude session memory in `.session-id`. Use this instead of `pm2 restart` alone; a plain `pm2 restart` can double-start the single-instance agent. When invoked without a TTY (e.g. when Nexo runs it via Telegram), the script re-launches itself detached via `setsid` so it survives pm2 killing its own parent process; output goes to `/tmp/nexo-restart.log`.
 - `npm run stop` / `npm run logs` / `npm run status` — pm2 passthroughs.
 - `npm run reset-session` — deletes `.session-id` and restarts. Use when the agent's accumulated Telegram conversation context has gone stale or wrong.
-- `npm run cleanup` — runs `scripts/cleanup.sh`: same flow as `restart` but also wipes `.session-id` first. Use when main's Claude session has gone stale or the main apps are in a weird state. Leaves the debug agent alone. Same detach-when-non-interactive trick as restart; output at `/tmp/nexo-cleanup.log`.
 
 There is no test suite, linter, or typecheck script. `tsconfig.json` is `noEmit: true` — types are checked by the editor, not in CI.
 

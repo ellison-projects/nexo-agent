@@ -39,7 +39,6 @@ After the above, a server reboot brings all three apps back automatically. No ma
 | `npm run start:debug` | pm2-start the debug agent. |
 | `npm run restart` | Bounce the main apps (`scripts/restart.sh`) — leaves debug untouched. |
 | `npm run reset-session` | Wipe main's Claude session memory (`.session-id`) and restart. |
-| `npm run cleanup` | Harder reset than restart — also wipes `.session-id`. Leaves debug untouched. |
 | `npm run logs` | `pm2 logs` — tail all apps. Use `pm2 logs nexo-debug-agent` for one. |
 | `npm run status` | `pm2 status` — list apps and their state. |
 | `npm run dev` | Run main agent locally (no pm2). Collides with the pm2 instance — stop main first. |
@@ -50,6 +49,6 @@ Whenever you change the desired running set (adding/removing an app, enabling de
 ## Why three pm2 apps
 
 - **Main and web** share `ecosystem.config.cjs` because they're bounced together by `npm run restart`.
-- **Debug** is deliberately in its own `ecosystem.debug.config.cjs` so the main lifecycle scripts (`restart`, `cleanup`, `npm start`) cannot reach it. That independence is the whole point: when main is crashed or in a restart loop, the debug agent is still reachable on Telegram (different bot token) and can read logs, reproduce errors, edit code, and bounce main for you.
+- **Debug** is deliberately in its own `ecosystem.debug.config.cjs` so the main lifecycle scripts (`restart`, `npm start`) cannot reach it. That independence is the whole point: when main is crashed or in a restart loop, the debug agent is still reachable on Telegram (different bot token) and can read logs, reproduce errors, edit code, and bounce main for you.
 
 See `CLAUDE.md` for a more detailed architecture tour and capability list.
