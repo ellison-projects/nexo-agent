@@ -129,10 +129,9 @@ interface AtScheduleArgs {
 }
 
 /** Schedule a one-shot curl-to-Telegram via `at`. The token and chat id are
- * baked into the at-spool script at scheduling time (same tradeoff the
- * telegram-reminder skill already accepts — the spool dir is not a broadcast
- * surface). Message body is routed through a temp file to sidestep shell
- * escaping entirely. Returns the at job id. */
+ * baked into the at-spool script at scheduling time — the spool dir is not
+ * a broadcast surface so this is acceptable. Message body is routed through
+ * a temp file to sidestep shell escaping entirely. Returns the at job id. */
 async function atSchedule(args: AtScheduleArgs): Promise<string> {
       // `at` takes relative minutes with no sub-minute precision. Round up so
       // we never fire early.
