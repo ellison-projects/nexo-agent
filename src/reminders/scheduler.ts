@@ -52,7 +52,7 @@ export async function reconcile(input: ReconcileInput): Promise<ReconcileSummary
             if (!hit) continue;
 
             for (const occ of expandOccurrences(event, now, windowEnd)) {
-                  const fireTs = computeFireTime(occ).getTime();
+                  const fireTs = computeFireTime(occ, hit.kind).getTime();
                   // Skip occurrences whose fire time has already passed. The
                   // feed sometimes still lists them for a grace period; we
                   // don't want to spam late.

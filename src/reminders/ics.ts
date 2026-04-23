@@ -15,6 +15,10 @@ export interface VEvent {
       tzid?: string;
       /** Raw RRULE value (minus the "RRULE:" prefix). Undefined for one-shot events. */
       rrule?: string;
+      /** Raw VALARM TRIGGER values (the portion after the colon). Captured so
+       * kind-specific fire-time rules can honor lead times (e.g. recurring
+       * tasks with lead_time_days). */
+      alarmTriggers?: string[];
 }
 
 export interface Occurrence {
@@ -27,6 +31,9 @@ export interface Occurrence {
       start: Date;
       isAllDay: boolean;
       tzid?: string;
+      /** Propagated from the parent VEvent so fire-time logic can read lead
+       * times without re-parsing the ICS. */
+      alarmTriggers?: string[];
 }
 
 /** Unfold continuation lines (RFC 5545 §3.1): CRLF followed by space/tab
@@ -151,11 +158,21 @@ export function parseIcal(ical: string): VEvent[] {
             }
             if (!current) continue;
 
-            // VALARMs are emitted by the feed but we intentionally ignore them —
-            // they exist for calendar-app UX, not push.
+            // VALARMs: most fields (ACTION, DESCRIPTION) are ignored since
+            // they exist for calendar-app UX, not push. TRIGGER is captured
+            // because it encodes lead times that some kinds (recurring tasks)
+            // want to honor.
             if (line === 'BEGIN:VALARM') { inAlarm = true; continue; }
             if (line === 'END:VALARM') { inAlarm = false; continue; }
-            if (inAlarm) continue;
+            if (inAlarm) {
+                  if (line.startsWith('TRIGGER:') || line.startsWith('TRIGGER;')) {
+                        const colon = line.indexOf(':');
+                        const value = line.slice(colon + 1);
+                        if (!current.alarmTriggers) current.alarmTriggers = [];
+                        current.alarmTriggers.push(value);
+                  }
+                  continue;
+            }
 
             if (line.startsWith('UID:')) current.uid = line.slice(4);
             else if (line.startsWith('SUMMARY:')) current.summary = unescapeIcalText(line.slice(8));
@@ -224,6 +241,7 @@ export function expandOccurrences(event: VEvent, windowStart: Date, windowEnd: D
             start: event.dtstart,
             isAllDay: event.isAllDay,
             tzid: event.tzid,
+            alarmTriggers: event.alarmTriggers,
       };
 
       if (!event.rrule) {
