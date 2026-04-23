@@ -1,6 +1,6 @@
 ---
 name: telegram-reminder
-description: Use ONLY when Matt explicitly says he wants the reminder delivered via Telegram — trigger phrases include "remind me with telegram", "remind me on telegram", "telegram reminder", "send me a telegram in X minutes", "telegram me in X". Schedules a one-shot Telegram message for a future time using the local `at` daemon on this box. For any reminder request that does NOT specifically name Telegram ("remind me to call mom tomorrow", "add a reminder about X", "set a reminder for 3pm") use the `nexo-prm` skill instead — NexoPRM's AI reminders are the default system. This skill is a narrow override only. Also handles listing/cancelling telegram-scheduled jobs via `atq` / `atrm`. Only suitable for short-term reminders (minutes to hours) — for multi-day reminders defer to `nexo-prm`.
+description: Use ONLY when Matt explicitly says he wants the reminder delivered via Telegram — trigger phrases include "remind me with telegram", "remind me on telegram", "telegram reminder", "send me a telegram in X minutes", "telegram me in X". Schedules a one-shot Telegram message for a future time using the local `at` daemon on this box. For any reminder request that does NOT specifically name Telegram ("remind me to call mom tomorrow", "add a reminder about X", "set a reminder for 3pm") use the `nexo-prm` skill instead — NexoPRM's AI reminders are the default system AND now auto-deliver to Telegram via the `nexo-reminders` pm2 app, so a PRM reminder will still land on Matt's phone. This skill is a narrow override only. Also handles listing/cancelling telegram-scheduled jobs via `atq` / `atrm`. Only suitable for short-term reminders (minutes to hours) — for multi-day reminders defer to `nexo-prm`.
 ---
 
 # Telegram reminder
@@ -24,6 +24,10 @@ Examples that do **not** match — these route to `nexo-prm`:
 - "add a reminder about the dentist appointment"
 
 When in doubt, use `nexo-prm`. Telegram-via-`at` is the narrow override; PRM is the default.
+
+**PRM reminders still reach Telegram.** The `nexo-reminders` pm2 app polls the NexoPRM iCalendar feed and auto-schedules Telegram pushes for upcoming AI reminders, todo reminders, home items, and recurring tasks (all-day items fire at 8am America/Chicago on the date; timed items fire at the event moment). That means routing a generic request to `nexo-prm` **still delivers on Telegram** within ~5 minutes of the PRM side going live — Matt does not lose the phone push by using PRM. The `nexo-reminders` job also reconciles cancellations: if a PRM reminder is marked done or deleted, the paired `at` job is `atrm`'d on the next tick.
+
+Use this skill only when Matt wants a push that bypasses PRM entirely — e.g. short-term "10 min from now" nudges where round-tripping through PRM adds friction for no benefit.
 
 ## Prerequisites
 
