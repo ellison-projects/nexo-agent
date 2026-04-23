@@ -70,10 +70,10 @@ The six fork-context project skills above (`nexo-prm`, `briefing`, `look-ahead`,
 
 - `npm run dev` — run the agent locally with `tsx` and `.env` loaded. No build step; TypeScript runs directly.
 - `npm start` — start under pm2 using `ecosystem.config.cjs`.
-- `npm run restart` — runs `scripts/restart.sh`: `pm2 delete`s both apps by name (so pm2's autorestart can't fire while we're cleaning up), `pkill`s any stray `tsx` dev processes, then `pm2 start`s fresh. The everyday bounce — preserves Claude session memory in `.session-id`. Use this instead of `pm2 restart` alone; a plain `pm2 restart` can double-start the single-instance agent. When invoked without a TTY (e.g. when Nexo runs it via Telegram), the script re-launches itself detached via `setsid` so it survives pm2 killing its own parent process; output goes to `/tmp/nexo-restart.log`.
+- `npm run restart` — runs `scripts/restart.sh`: `pm2 delete`s both apps by name (so pm2's autorestart can't fire while we're cleaning up), then `pm2 start`s fresh. The everyday bounce — preserves Claude session memory in `.session-id`. Use this instead of `pm2 restart` alone; a plain `pm2 restart` can double-start the single-instance agent. When invoked without a TTY (e.g. when Nexo runs it via Telegram), the script re-launches itself detached via `setsid` so it survives pm2 killing its own parent process; output goes to `/tmp/nexo-restart.log`.
 - `npm run stop` / `npm run logs` / `npm run status` — pm2 passthroughs.
 - `npm run reset-session` — deletes `.session-id` and restarts. Use when the agent's accumulated Telegram conversation context has gone stale or wrong.
-- `npm run cleanup` — runs `scripts/cleanup.sh`: the nuclear "reset to a clean state" button. Wipes `.session-id` (clears Claude's memory), `pm2 kill`s the daemon (stops every pm2-managed process — catches renamed zombies like `telegram-bot`, stale `pm_id`s, anything pm2 was tracking), `pkill`s stray `tsx` dev processes, then `pm2 start`s the apps fresh from `ecosystem.config.cjs`. Use when the box is in a weird state or you want a known-good baseline. Same detach-when-non-interactive trick as restart; output goes to `/tmp/nexo-cleanup.log`.
+- `npm run cleanup` — runs `scripts/cleanup.sh`: same flow as `restart` but also wipes `.session-id` first. Use when main's Claude session has gone stale or the main apps are in a weird state. Leaves the debug agent alone. Same detach-when-non-interactive trick as restart; output at `/tmp/nexo-cleanup.log`.
 
 There is no test suite, linter, or typecheck script. `tsconfig.json` is `noEmit: true` — types are checked by the editor, not in CI.
 
@@ -152,7 +152,7 @@ The goal: be helpful and thoughtful, not just a literal command executor.
 
 ## Runtime constraints worth knowing
 
-- **Single-instance only.** `ecosystem.config.cjs` pins `instances: 1, exec_mode: 'fork'`, and `npm run restart` `pkill`s stray `tsx` processes first. Two agents polling the same `getUpdates` offset will duplicate replies and fight over `.session-id`.
+- **Single-instance only.** `ecosystem.config.cjs` pins `instances: 1, exec_mode: 'fork'`. Two agents polling the same `getUpdates` offset will duplicate replies and fight over `.session-id`. If you use `npm run dev`, stop the pm2 instance first (`pm2 stop nexo-agent`) and don't leave dev orphans behind when you're done.
 - **ESM project** (`"type": "module"`). Imports use explicit relative paths without `.js` extensions — `tsx` handles the resolution.
 - **`.env` is loaded by `tsx --env-file=.env`**, not `dotenv`. Don't add a `dotenv` import.
 - **`.session-id` is state, not config.** Deleting it resets the agent's memory of prior Telegram turns. It's gitignored for that reason.

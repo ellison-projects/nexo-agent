@@ -42,11 +42,7 @@ notify "🔄 Restarting Nexo..."
 pm2 delete nexo-agent >/dev/null 2>&1 || true
 pm2 delete nexo-web >/dev/null 2>&1 || true
 
-# Clean up any stray dev-mode tsx processes (npm run dev / dev:web orphans).
-pkill -f 'tsx.*src/index.ts' || true
-pkill -f 'tsx.*src/web/server.ts' || true
-
-notify "🧹 Old processes cleared, booting fresh..."
+notify "🧹 Old apps cleared, booting fresh..."
 
 # Fresh start — apps were deleted above, so this is a clean register + boot.
 pm2 start ecosystem.config.cjs --update-env
