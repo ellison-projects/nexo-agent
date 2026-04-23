@@ -1,4 +1,5 @@
 node_modules
 .session-id
+.session-id.debug
 bot.log
 public/api-snapshots/
