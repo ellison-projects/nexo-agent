@@ -13,8 +13,8 @@ Three pm2 apps live in this repo:
 One-time, assuming Node 22+ and a populated `.env`:
 
 ```bash
-npm ci
-npm install -g pm2            # or use the local devDependency: npx pm2 ...
+npm ci                        # pm2 is in devDependencies — use `npx pm2 ...`
+                              # or install globally with `npm i -g pm2`
 npm start                     # starts nexo-agent + nexo-web
 npm run start:debug           # starts nexo-debug-agent
 pm2 save                      # snapshot the current app list to ~/.pm2/dump.pm2
@@ -37,6 +37,8 @@ After the above, a server reboot brings all three apps back automatically. No ma
 |---|---|
 | `npm start` | pm2-start the main apps (nexo-agent + nexo-web). |
 | `npm run start:debug` | pm2-start the debug agent. |
+| `npm run stop` | pm2-stop the main apps. |
+| `npm run stop:debug` | pm2-stop the debug agent. |
 | `npm run restart` | Bounce the main apps (`scripts/restart.sh`) — leaves debug untouched. |
 | `npm run reset-session` | Wipe main's Claude session memory (`.session-id`) and restart. |
 | `npm run logs` | `pm2 logs` — tail all apps. Use `pm2 logs nexo-debug-agent` for one. |

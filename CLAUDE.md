@@ -78,7 +78,7 @@ There is no test suite, linter, or typecheck script. `tsconfig.json` is `noEmit:
 
 ## Architecture
 
-Two pm2 apps sharing one repo:
+Two pm2 apps sharing one repo (plus a third, `nexo-debug-agent`, a deliberately independent Telegram bot for diagnosing the main agent when it's broken — source in `src/debug/`, config in `ecosystem.debug.config.cjs`; see `README.md` for setup):
 
 **Agent (`nexo-agent`)** — a few small files, each a single responsibility:
 

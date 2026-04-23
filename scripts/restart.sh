@@ -35,10 +35,10 @@ notify() {
 
 notify "🔄 Restarting Nexo..."
 
-# Delete by name so pm2 forgets the apps entirely — this disables autorestart
-# before we start killing processes, and clears any duplicate entries left by
-# previous `pm2 start` runs. Called one at a time because `pm2 delete a b` has
-# been observed to only delete the first name on some pm2 versions.
+# Delete by name so pm2 forgets the apps entirely, clearing any duplicate
+# entries left by previous `pm2 start` runs. Called one at a time because
+# `pm2 delete a b` has been observed to only delete the first name on some
+# pm2 versions.
 pm2 delete nexo-agent >/dev/null 2>&1 || true
 pm2 delete nexo-web >/dev/null 2>&1 || true
 
