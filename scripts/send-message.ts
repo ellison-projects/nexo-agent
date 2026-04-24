@@ -1,5 +1,5 @@
 import { env } from '../src/env';
-import { sendMessage } from '../src/telegram';
+import { sendLongMessage } from '../src/telegram';
 
 async function readStdin(): Promise<string> {
       const chunks: Buffer[] = [];
@@ -20,8 +20,8 @@ if (!text) {
 
 try {
       const chatId = Number(env.telegramChatId);
-      const messageId = await sendMessage(chatId, text);
-      console.log(`Sent message ${messageId} to chat ${chatId}`);
+      const ids = await sendLongMessage(chatId, text);
+      console.log(`Sent ${ids.length} message(s) to chat ${chatId}: ${ids.join(', ')}`);
 } catch (err) {
       console.error(err instanceof Error ? err.message : String(err));
       process.exit(1);
