@@ -201,6 +201,32 @@ Household maintenance / chores ("replace smoke alarm batteries", "regrout shower
 - `PATCH /api/agent/home-item-notes/{noteId}` — writable: `content`.
 - `DELETE /api/agent/home-item-notes/{noteId}?confirm=true`
 
+### Projects
+Multi-week initiatives (job searches, holiday planning, training plans). Each has an editable collection of **notes**, a flat **next-actions** checklist, optional pillar tag, optional target date, freeform tags, and linked people.
+
+**Mental model:** projects are for threads with a lifespan — opens, accumulates notes + actions over weeks/months, quietly fades. One-off events go in moments. Multi-week threads belong on projects.
+
+Each note has a `kind` — `note` (regular observation) or `reflection` (distilled lesson). Notes are fully editable after creation. When user asks "what did I learn from X?", filter notes by `kind=reflection`.
+
+- `GET /api/agent/projects?tag=&include=archived` — list. Excludes archived by default. `?tag=mothers-day` filters case-insensitive.
+- `POST /api/agent/projects` — create. Required: `title`. Optional: `description`, `pillar` (`family`/`relationships`/`health`/`ambitions`), `target_date`, `tags`.
+- `GET /api/agent/projects/tags` — distinct tags across non-archived projects with counts. Use for autocompletion/discovery.
+- `GET /api/agent/projects/{id}` — full detail in one call — `project`, `notes` (each with `images`), `actions`, `linked_people`.
+- `PATCH /api/agent/projects/{id}` — partial update. Pin/unpin via `pinned_at` (ISO or null). Archive/unarchive via `archived_at` (ISO or null).
+- `DELETE /api/agent/projects/{id}?confirm=true` — cascades to notes, actions, images.
+- `POST /api/agent/projects/{id}/notes` — add note. Required: `content`. Optional: `kind` (`note` default, or `reflection`), `image_urls`, `created_at`.
+- `PATCH /api/agent/projects/{id}/notes/{noteId}` — edit content/kind; `add_image_urls`, `remove_image_ids`. Fully editable.
+- `DELETE /api/agent/projects/{id}/notes/{noteId}?confirm=true`
+- `POST /api/agent/projects/{id}/actions` — add next-action. Required: `content`. Optional: `due_date`.
+- `PATCH /api/agent/projects/{id}/actions/{actionId}` — edit content/due/sort or mark done via `done_at` (ISO or null).
+- `DELETE /api/agent/projects/{id}/actions/{actionId}?confirm=true`
+- `POST /api/agent/projects/{id}/people` — link person. `{ "person_id": "..." }`.
+- `DELETE /api/agent/projects/{id}/people/{personId}?confirm=true` — unlink.
+
+**When to use `reflection` vs `note`:** note = "what happened" (raw observation). reflection = "the lesson" (distilled takeaway). Filter to reflections when user looks back across time.
+
+**Tag handling:** tags stored lowercase; case-insensitive dedup. `?tag=` filter is also case-insensitive.
+
 ### Reports (read-only rollups)
 Rollup views that answer "show me everyone who matches X" without chaining multiple queries. Use when the user wants a **list**, not a briefing.
 
@@ -657,6 +683,86 @@ Report back:
 
 ---
 
+### Flow G — Add a note to a project (multi-week threads)
+
+**User:** "Note that the interview with Acme went well" or "Add a reflection on Mother's Day planning"
+
+Multi-week threads belong on projects, not moments. Projects are for initiatives with a lifespan (job searches, holiday planning, training plans).
+
+**Step 1. Find or create the project.**
+```bash
+# Search for existing project by tag
+curl -s "https://app.nexoprm.com/api/agent/projects?tag=interview-prep" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User: $NEXO_USER"
+```
+
+If no project exists, create one:
+```bash
+curl -s -X POST "https://app.nexoprm.com/api/agent/projects" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User: $NEXO_USER" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Interview prep","tags":["interview-prep"],"pillar":"ambitions"}'
+```
+
+Response (201):
+```json
+{
+  "project": {
+    "id": "42",
+    "title": "Interview prep",
+    "tags": ["interview-prep"],
+    "pillar": "ambitions",
+    "created_at": "2026-04-24T..."
+  }
+}
+```
+
+**Step 2. Add the note.**
+```bash
+curl -s -X POST "https://app.nexoprm.com/api/agent/projects/42/notes" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User": $NEXO_USER" \
+  -H "Content-Type: application/json" \
+  -d '{"content":"Acme round 2 went well — they want me owning the platform roadmap.","kind":"note"}'
+```
+
+For "lessons learned" content, use `"kind": "reflection"`:
+```bash
+curl -s -X POST "https://app.nexoprm.com/api/agent/projects/42/notes" \
+  -H "Authorization: Bearer $NEXO_API_KEY" \
+  -H "X-Nexo-User: $NEXO_USER" \
+  -H "Content-Type: application/json" \
+  -d '{"content":"Key lesson: focus on impact metrics, not just features.","kind":"reflection"}'
+```
+
+Expected response (201):
+```json
+{
+  "note": {
+    "id": "812",
+    "project_id": "42",
+    "content": "Acme round 2 went well...",
+    "kind": "note",
+    "created_at": "2026-04-24T..."
+  }
+}
+```
+
+**Step 3. Report back.**
+> "Added note #812 to Interview prep project (#42)."
+
+**Editing notes:** Unlike moments, project notes are editable. If user says "rework that last note to say...", use `PATCH /projects/{id}/notes/{noteId}` with new `content`.
+
+**Reflections vs notes:**
+- `note` = "what happened" (raw observation, written in the moment)
+- `reflection` = "the lesson" (distilled takeaway, written mid-flight or at end)
+
+When user asks "what did I learn from X?", filter notes by `kind=reflection`.
+
+---
+
 ## Other common operations (quick reference)
 
 - **"What do I know about Sarah?"** → `GET /people?q=sarah` to resolve id, then `GET /people/{id}` — returns everything (moments, things-to-remember, reminders, lists, groups, relationships, articles, ai_summary) in one call.
@@ -672,6 +778,8 @@ Report back:
 - **Check off a plan item:** `GET /working-notes/latest` → find item → `PATCH /working-note-items/{id}` with `{ "checked": true }`.
 - **Add long-form notes to a heading:** `PATCH /working-note-items/{headingId}` with `{ "notes": "Long-form project context here..." }`.
 - **Promote a heading to the top:** `GET /working-notes/latest` → reorder items array (heading + children to front) → `PUT /working-notes/latest/reorder` with `{ "item_ids": [...] }`.
+- **Add a note to a project (multi-week thread):** `GET /projects?tag=<tag>` to find or `POST /projects` to create → `POST /projects/{id}/notes` with `{ "content": "...", "kind": "note" }` (or `"reflection"` for lessons learned). See Flow G.
+- **Pull up reflections from a project:** `GET /projects?tag=<tag>` → `GET /projects/{id}` → filter `notes` array by `kind=reflection`.
 - **Delete anything:** append `?confirm=true`. Only after explicit user intent. Example:
   ```bash
   curl -s -X DELETE "https://app.nexoprm.com/api/agent/moments/812?confirm=true" \
