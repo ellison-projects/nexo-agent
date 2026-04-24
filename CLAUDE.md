@@ -149,6 +149,30 @@ Don't take requests at face value. Act like a smart chief of staff who thinks be
 
 The goal: be helpful and thoughtful, not just a literal command executor.
 
+## Working with time and timezones
+
+**Matt's timezone:** CST (Central Standard Time, UTC-6)
+
+**NEVER do manual timezone math.** When calculating future times for reminders, cron jobs, or `at` scheduling, always use the `scripts/get-time.sh` helper:
+
+```bash
+# Current time in ISO format (UTC)
+./scripts/get-time.sh
+
+# 10 minutes from now
+./scripts/get-time.sh "+10 minutes"
+
+# 2 hours from now
+./scripts/get-time.sh "+2 hours"
+
+# Tomorrow at same time
+./scripts/get-time.sh "+1 day"
+```
+
+The script returns ISO 8601 UTC timestamps suitable for the NexoPRM API (`due_at` fields, etc.).
+
+**Common mistake to avoid:** Don't try to convert between CST and UTC manually — you will get it wrong. The server runs on UTC. When Matt says "in 10 minutes," just use `./scripts/get-time.sh "+10 minutes"` and pass the result directly to the API.
+
 ## Runtime constraints worth knowing
 
 - **Single-instance only.** `ecosystem.config.cjs` pins `instances: 1, exec_mode: 'fork'`. Two agents polling the same `getUpdates` offset will duplicate replies and fight over `.session-id`. If you use `npm run dev`, stop the pm2 instance first (`pm2 stop nexo-agent`) and don't leave dev orphans behind when you're done.
