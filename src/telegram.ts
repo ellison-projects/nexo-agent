@@ -85,6 +85,44 @@ export async function sendMessage(chatId: number, text: string): Promise<number>
       return data.result.message_id;
 }
 
+// Telegram caps messages at 4096 chars. mdToHtml expands the text somewhat
+// (bold/italic/link tags), so we chunk the raw markdown at a conservative
+// size to leave room for expansion. Splits prefer paragraph > line > word
+// > hard boundaries to keep chunks readable.
+const CHUNK_TARGET = 3500;
+
+export function chunkMessage(text: string, maxLen: number = CHUNK_TARGET): string[] {
+      if (text.length <= maxLen) return [text];
+      const separators = ['\n\n', '\n', ' ', ''];
+      const chunks: string[] = [];
+      let remaining = text;
+      while (remaining.length > maxLen) {
+            let splitAt = maxLen;
+            for (const sep of separators) {
+                  if (!sep) break;
+                  const idx = remaining.lastIndexOf(sep, maxLen);
+                  if (idx > 0) {
+                        splitAt = idx + sep.length;
+                        break;
+                  }
+            }
+            const chunk = remaining.slice(0, splitAt).trimEnd();
+            if (chunk) chunks.push(chunk);
+            remaining = remaining.slice(splitAt);
+      }
+      if (remaining.trim()) chunks.push(remaining);
+      return chunks;
+}
+
+export async function sendLongMessage(chatId: number, text: string): Promise<number[]> {
+      const chunks = chunkMessage(text);
+      const ids: number[] = [];
+      for (const chunk of chunks) {
+            ids.push(await sendMessage(chatId, chunk));
+      }
+      return ids;
+}
+
 export async function sendReminderBotMessage(chatId: number, text: string): Promise<number> {
       const res = await fetch(`https://api.telegram.org/bot${env.telegramReminderBotToken}/sendMessage`, {
             method: 'POST',
