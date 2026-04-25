@@ -103,11 +103,11 @@ Read-only roll-up of the user's whole state. Use for open-ended prompts ("debrie
 - `GET|PATCH|DELETE /api/agent/things-to-remember/{id}` — PATCH body `{ content }`.
 
 ### AI reminders
-Two sources: `moment` (AI-generated from a moment) and `manual` (agent-created one-offs via POST).
-- `GET /api/agent/ai-reminders?personId=&status=&dueBefore=&source=&limit=&offset=` — status one of `new`, `done`, `dismissed`. `source` one of `moment`, `manual`.
-- `POST /api/agent/ai-reminders` — create a one-off manual reminder. Required: `due_at`, `message`. Optional: `notes`, `person_id`, `category`, `rationale`, `status`. Stored with `source='manual'`, `moment_id=null`. `message` is the concise, actionable reminder text shown everywhere (in-app headline, ICS SUMMARY/DESCRIPTION, email subject). `rationale` (optional) is short "why this reminder exists" context shown beneath the headline—use when the reason isn't obvious from `message` alone. `notes` is for longer free-form details.
+Two sources: `moment` (AI-generated from a moment) and `manual` (agent-created one-offs via POST). Reminders can attach to both a person and/or a project.
+- `GET /api/agent/ai-reminders?personId=&projectId=&status=&dueBefore=&source=&limit=&offset=` — status one of `new`, `done`, `dismissed`. `source` one of `moment`, `manual`. Filter by `projectId` to get project-specific reminders.
+- `POST /api/agent/ai-reminders` — create a one-off manual reminder. Required: `due_at`, `message`. Optional: `notes`, `person_id`, `project_id`, `category`, `rationale`, `status`. Stored with `source='manual'`, `moment_id=null`. `message` is the concise, actionable reminder text shown everywhere (in-app headline, ICS SUMMARY/DESCRIPTION, email subject). `rationale` (optional) is short "why this reminder exists" context shown beneath the headline—use when the reason isn't obvious from `message` alone. `notes` is for longer free-form details. Set `project_id` for multi-week thread reminders (e.g., "order flowers" in Mother's Day project); set `person_id` for person-specific; set both when applicable.
 - `GET /api/agent/ai-reminders/{id}` — response includes `source`; manual reminders have `moment_id=null`.
-- `PATCH /api/agent/ai-reminders/{id}` — update any subset of `status`, `due_at`, `message`, `notes`, `person_id`, `rationale`. Pass `person_id: null` to detach the person, or `notes: null`/`""` to clear notes. Works for both moment-sourced and manual reminders.
+- `PATCH /api/agent/ai-reminders/{id}` — update any subset of `status`, `due_at`, `message`, `notes`, `person_id`, `project_id`, `rationale`. Pass `person_id: null` or `project_id: null` to detach, or `notes: null`/`""` to clear notes. Works for both moment-sourced and manual reminders.
 
 ### Relationships
 - `GET|POST /api/agent/relationships` — POST body `{ name, notes, reminder }`.
@@ -211,9 +211,9 @@ Each note has a `kind` — `note` (regular observation) or `reflection` (distill
 - `GET /api/agent/projects?tag=&include=archived` — list. Excludes archived by default. `?tag=mothers-day` filters case-insensitive.
 - `POST /api/agent/projects` — create. Required: `title`. Optional: `description`, `pillar` (`family`/`relationships`/`health`/`ambitions`), `target_date`, `tags`.
 - `GET /api/agent/projects/tags` — distinct tags across non-archived projects with counts. Use for autocompletion/discovery.
-- `GET /api/agent/projects/{id}` — full detail in one call — `project`, `notes` (each with `images`), `actions`, `linked_people`.
+- `GET /api/agent/projects/{id}` — full detail in one call — `project`, `notes` (each with `images`), `actions`, `linked_people`, `reminders` (open first by `due_at`, then handled).
 - `PATCH /api/agent/projects/{id}` — partial update. Pin/unpin via `pinned_at` (ISO or null). Archive/unarchive via `archived_at` (ISO or null).
-- `DELETE /api/agent/projects/{id}?confirm=true` — cascades to notes, actions, images.
+- `DELETE /api/agent/projects/{id}?confirm=true` — cascades to notes, actions, images, reminders.
 - `POST /api/agent/projects/{id}/notes` — add note. Required: `content`. Optional: `kind` (`note` default, or `reflection`), `image_urls`, `created_at`.
 - `PATCH /api/agent/projects/{id}/notes/{noteId}` — edit content/kind; `add_image_urls`, `remove_image_ids`. Fully editable.
 - `DELETE /api/agent/projects/{id}/notes/{noteId}?confirm=true`
@@ -770,8 +770,8 @@ When user asks "what did I learn from X?", filter notes by `kind=reflection`.
 - **Link two people:** resolve both ids → `GET /connection-groups` to find existing group or `POST /connection-groups` to create → `POST /connection-groups/{id}/members` with `{ person_id, role? }` for each. See Flow F.
 - **Set/update a member's role in a group:** `PATCH /connection-groups/{groupId}/members/{personId}` with `{ "role": "spouse" }` or `{ "role": null }` to clear.
 - **Add grocery item:** ALWAYS search stash first with `GET /stash?tag=grocery&q=<item>`. If match found, `POST /groceries/lists/active/items` with `{ "stash_id": "..." }` (omit name). If no match, use `{ "name": "..." }`. See Flow B.
-- **Create a manual reminder:** `POST /ai-reminders` with `{ "due_at": "2026-04-25T17:00:00Z", "message": "Check in with Sarah", "notes": "Ask about her dad's recovery", "person_id": "42" }` (person_id, notes, and rationale optional).
-- **Update a reminder's due date or message:** `PATCH /ai-reminders/{id}` with any subset of `{ "due_at": "...", "message": "...", "notes": "...", "person_id": "...", "rationale": "..." }`. Works for both moment-sourced and manual reminders.
+- **Create a manual reminder:** `POST /ai-reminders` with `{ "due_at": "2026-04-25T17:00:00Z", "message": "Check in with Sarah", "notes": "Ask about her dad's recovery", "person_id": "42" }` (person_id, project_id, notes, and rationale optional). Set `project_id` for multi-week thread reminders.
+- **Update a reminder's due date or message:** `PATCH /ai-reminders/{id}` with any subset of `{ "due_at": "...", "message": "...", "notes": "...", "person_id": "...", "project_id": "...", "rationale": "..." }`. Works for both moment-sourced and manual reminders.
 - **Mark a reminder handled:** `GET /ai-reminders?status=new` → `PATCH /ai-reminders/{id}` with `{ "status": "done" }`.
 - **Add a durable fact about someone:** resolve id → `POST /things-to-remember` with `{ person_id, content }`.
 - **Save a non-person fact:** `POST /stash` with `{ "title": "...", "note": "...", "tags": [...] }`. Use for products, places, gate codes, etc.
