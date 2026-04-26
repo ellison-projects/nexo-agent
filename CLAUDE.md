@@ -19,7 +19,8 @@ Deeper personal context — bio, goals, preferences — lives in `docs/matt/`. R
 The agent currently has:
 
 - **`nexo-people` skill** (`.claude/skills/nexo-people/`) — reads/writes person-attached PRM data: people, moments, things-to-remember, AI reminders, relationships, connection groups, lists, and people reports. Has main-thread pre-flight rules baked into its description: address/phone/email updates check for spouse first; new contacts get duplicate-detected; spouse/partner links offer a household group; moments that imply durable facts ask whether to also save as a thing-to-remember. Triggers: "log that Sarah mentioned X", "what do I know about Alex", "Sarah's birthday", "link Sam to John", "add Sarah's address", "remind me to text Cassie tomorrow", "add Tom as a contact".
-- **`nexo-prm` skill** (`.claude/skills/nexo-prm/`) — reads/writes the non-person side of NexoPRM: working notes / plans, areas of focus, meals, food log, groceries, home items, stash (non-person knowledge base), and projects (multi-week threads). Also handles the lightweight "debrief" todos rollup. Person-attached requests go to `nexo-people`, not here.
+- **`nexo-grocery` skill** (`.claude/skills/nexo-grocery/`) — reads/writes NexoPRM grocery data: adding items, checking them off, viewing the list, and managing grocery-related stash entries. Always searches Stash first for brand-specific products before adding items. Triggers: "add milk to my groceries", "what's on my grocery list", "check off eggs", "save this grocery item to stash".
+- **`nexo-prm` skill** (`.claude/skills/nexo-prm/`) — reads/writes the non-person side of NexoPRM: working notes / plans, areas of focus, meals, food log, home items, stash (non-person knowledge base), and projects (multi-week threads). Also handles the lightweight "debrief" todos rollup. Person-attached requests go to `nexo-people`, grocery requests go to `nexo-grocery`.
 - **Briefing skills** — three-way family, all snapshot to `public/briefings/` (tracked in git; the skills auto-commit and push each snapshot so history follows the repo across machines):
   - **`briefing`** (`.claude/skills/briefing/`) — generic catch-all. Canonical spec for snapshot mechanics; siblings reference it. Triggers: "brief me", "daily briefing", "catch me up".
   - **`look-ahead`** (`.claude/skills/look-ahead/`) — forward-looking, decision-first. Overdue reminders + next-7-day important dates + flagged plan items. Triggers: "what's next", "plan my day", "morning briefing".
@@ -54,7 +55,7 @@ Additional skills will likely land here over time (calendar, email, etc.). When 
 
 ## Invoking skills
 
-The seven fork-context project skills above (`nexo-prm`, `briefing`, `look-ahead`, `look-back`, `remember`, `refresh-api-docs`, `setup-cron`) run with `context: fork` — their SKILL.md bodies execute in an isolated subagent that **has no access to this conversation**. (`nexo-people` is the exception — it runs inline in the main thread for smoother UX, since its smart behaviors need to ask Matt mid-flow.) That means:
+The eight fork-context project skills above (`nexo-grocery`, `nexo-prm`, `briefing`, `look-ahead`, `look-back`, `remember`, `refresh-api-docs`, `setup-cron`) run with `context: fork` — their SKILL.md bodies execute in an isolated subagent that **has no access to this conversation**. (`nexo-people` is the exception — it runs inline in the main thread for smoother UX, since its smart behaviors need to ask Matt mid-flow.) That means:
 
 - The fork can't see pronouns or back-references ("add that to groceries", "yes, do it"). Resolve those in the main thread first.
 - Pass a complete, self-contained task string as the skill argument. The fork's prompt is `SKILL.md` content + the args you send — that's all.
@@ -64,7 +65,8 @@ The seven fork-context project skills above (`nexo-prm`, `briefing`, `look-ahead
 **Skill-specific notes:**
 
 - **`nexo-people`** — runs inline (not forked), so just invoke it and follow its body inline. The body has smart-behavior playbooks for spouse-aware address/contact updates, duplicate-checked person creation, household-group nudges on spouse links, and moment→TTR offers — read first, ask Matt, then write. Don't rush past those checks.
-- **`nexo-prm`** — pass the full intent, e.g. `Add 'Coke Zero 12-pack' to Matt's grocery list`, not `add coke`.
+- **`nexo-grocery`** — pass the full intent, e.g. `Add 'Coke Zero 12-pack' to Matt's grocery list`, not `add coke`.
+- **`nexo-prm`** — pass the full intent with context about what to add/update.
 - **`remember`** — two-phase: first, in the main thread, clean up the wording and pick the destination per the decision tree in the skill body (or ask Matt), and confirm both with him. Then invoke with a pipe-delimited arg of the form `<cleaned fact> | <destination path> | <heading>`. `<heading>` is either an existing/desired heading in the file (e.g. `## People`) or the exact sentinel `new file` (unquoted, lowercase) to create the destination. The `|` character is reserved — it must not appear inside any field. The fork only writes + commits + pushes.
 - **Briefing family + refresh-api-docs** — args are optional; pass emphasis/focus/window-selection if Matt specified one, otherwise invoke with no args for default behavior.
 
