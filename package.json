@@ -13,7 +13,7 @@
     "restart": "./scripts/restart.sh",
     "logs": "pm2 logs",
     "status": "pm2 status",
-    "reset-session": "rm -f \"${NEXO_AGENT_CWD:-.}/.session-id\" && npm run restart",
+    "reset-session": "rm -f \"${NEXO_AGENT_CWD:-.}/.session-id\"",
     "send-file": "npx tsx --env-file=.env scripts/send-file.ts",
     "send-message": "npx tsx --env-file=.env scripts/send-message.ts"
   },

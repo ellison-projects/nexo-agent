@@ -103,7 +103,7 @@ When I say a single word like "restart", "logs", "reset", "status" etc., first c
 
 **"Restart" (and anything around that word — "restart again", "bounce it", "reboot nexo", "kick the bot", etc.) always means run `npm run restart`.** Don't treat a repeat "restart" as redundant conversation; re-run the command. The restart script is idempotent and safe to run back-to-back.
 
-**"Reset" means run `npm run reset-session`** — this deletes the `.session-id` file (clearing Claude's conversation memory) and restarts the agent. Respond with: "Starting a new session — clearing conversation history and restarting." This is different from a regular restart which preserves session memory.
+**"Reset" means run `npm run reset-session`** — this deletes the `.session-id` file (clearing Claude's conversation memory). After resetting, you'll need to manually restart with `npm run restart` for the fresh session to take effect. This is different from a regular restart which preserves session memory.
 
 When I ask you to run a command, state the exact command you're about to run **before** invoking it, so I can catch a misinterpretation before it executes.
 
