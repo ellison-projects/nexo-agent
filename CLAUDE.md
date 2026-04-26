@@ -54,7 +54,7 @@ Additional skills will likely land here over time (calendar, email, etc.). When 
 
 ## Invoking skills
 
-The eight fork-context project skills above (`nexo-people`, `nexo-prm`, `briefing`, `look-ahead`, `look-back`, `remember`, `refresh-api-docs`, `setup-cron`) run with `context: fork` — their SKILL.md bodies execute in an isolated subagent that **has no access to this conversation**. That means:
+The seven fork-context project skills above (`nexo-prm`, `briefing`, `look-ahead`, `look-back`, `remember`, `refresh-api-docs`, `setup-cron`) run with `context: fork` — their SKILL.md bodies execute in an isolated subagent that **has no access to this conversation**. (`nexo-people` is the exception — it runs inline in the main thread for smoother UX, since its smart behaviors need to ask Matt mid-flow.) That means:
 
 - The fork can't see pronouns or back-references ("add that to groceries", "yes, do it"). Resolve those in the main thread first.
 - Pass a complete, self-contained task string as the skill argument. The fork's prompt is `SKILL.md` content + the args you send — that's all.
@@ -63,7 +63,7 @@ The eight fork-context project skills above (`nexo-people`, `nexo-prm`, `briefin
 
 **Skill-specific notes:**
 
-- **`nexo-people`** — pass the full intent, e.g. `Add Sarah Chen's new address: 123 Main St`, not `update address`. The skill description lists pre-flight checks (spouse-address, duplicate detection, etc.) that the main thread runs *before* invoking — they require an extra read-invoke + a confirmation question to Matt before the final write-invoke. Don't skip them.
+- **`nexo-people`** — runs inline (not forked), so just invoke it and follow its body inline. The body has smart-behavior playbooks for spouse-aware address/contact updates, duplicate-checked person creation, household-group nudges on spouse links, and moment→TTR offers — read first, ask Matt, then write. Don't rush past those checks.
 - **`nexo-prm`** — pass the full intent, e.g. `Add 'Coke Zero 12-pack' to Matt's grocery list`, not `add coke`.
 - **`remember`** — two-phase: first, in the main thread, clean up the wording and pick the destination per the decision tree in the skill body (or ask Matt), and confirm both with him. Then invoke with a pipe-delimited arg of the form `<cleaned fact> | <destination path> | <heading>`. `<heading>` is either an existing/desired heading in the file (e.g. `## People`) or the exact sentinel `new file` (unquoted, lowercase) to create the destination. The `|` character is reserved — it must not appear inside any field. The fork only writes + commits + pushes.
 - **Briefing family + refresh-api-docs** — args are optional; pass emphasis/focus/window-selection if Matt specified one, otherwise invoke with no args for default behavior.
