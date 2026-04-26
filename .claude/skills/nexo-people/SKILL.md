@@ -1,6 +1,6 @@
 ---
 name: nexo-people
-description: Use for person-attached data in NexoPRM — people, moments (timestamped observations), things-to-remember (durable facts), AI reminders (when attached to a person), relationships, connection groups (the way to link people together), lists (action rosters of people), and people reports. Calls the NexoPRM Agent API at app.nexoprm.com. Triggers: "log that Sarah mentioned X", "what do I know about Alex", "Sarah's birthday", "link Sam to John", "add Sarah's address", "update Tom's phone", "remind me to text Cassie tomorrow", "Jamie prefers texting", "who haven't I categorized yet", "add Tom as a contact". The skill body has smart-behavior playbooks for common cases — spouse-aware address/contact updates, duplicate-checked person creation, household-group nudge on spouse links, moment→thing-to-remember offer.
+description: Use for person-attached data in NexoPRM — people, moments (timestamped observations), things-to-remember (durable facts), AI reminders (when attached to a person), connection groups (the way to link people together), lists (action rosters of people), and people reports. Calls the NexoPRM Agent API at app.nexoprm.com. Triggers: "log that Sarah mentioned X", "what do I know about Alex", "Sarah's birthday", "link Sam to John", "add Sarah's address", "update Tom's phone", "remind me to text Cassie tomorrow", "Jamie prefers texting", "who haven't I categorized yet", "add Tom as a contact". The skill body has smart-behavior playbooks for common cases — spouse-aware address/contact updates, duplicate-checked person creation, household-group nudge on spouse links, moment→thing-to-remember offer.
 ---
 
 # NexoPRM Agent API — People
@@ -26,7 +26,7 @@ Base URL: `https://app.nexoprm.com`
 
 ## Safety rules
 
-1. **Every `DELETE` must include `?confirm=true`** or the server returns `400 validation_error`. Only delete on explicit intent.
+1. **Every `DELETE` must include `?confirm=true`** or the server returns `400 validation_error`. Only delete on explicit intent. Every destructive write (DELETE, PATCH, PUT) is recoverable — the API auto-creates a before-state snapshot. The `nexo-prm` skill documents the `/api/agent/snapshots` endpoints if Matt asks to see or recover one.
 2. **Never log or echo `NEXO_API_KEY`.**
 3. **Disambiguate people before writing.** When Matt refers to someone by first name/nickname:
    - Search with `GET /people?q=<name>`.
@@ -90,20 +90,20 @@ All list endpoints accept `limit` (default 50, max 200) and `offset` (default 0)
 ### People
 - `GET /api/agent/people?q=&limit=&offset=` — search by name/email/phone substring.
 - `POST /api/agent/people` — only `name` required. Other fields: `email`, `phone`, `address`, `important_dates` (array of `{label, date, recurring}`), `relationship` (`{connectionType}`), `topics` (string array), `pinned_at`.
-- `GET /api/agent/people/{id}` — **THE endpoint for learning everything about a person in one call.** Returns `person` + `moments` (up to 100, each with `images`) + `things_to_remember` + `lists` + `connection_groups` + `relationships` (couple/family groups) + `saved_articles` + `ai_reminders` (up to 100, all statuses) + `ai_summary`. Use this for "what do I know about X" — and as the spouse/household read in smart behaviors #1 and #2.
+- `GET /api/agent/people/{id}` — **THE endpoint for learning everything about a person in one call.** Returns `person` + `moments` (up to 100, each with `images`) + `things_to_remember` + `lists` + `connection_groups` + `saved_articles` + `ai_reminders` (up to 100, all statuses) + `ai_summary`. Use this for "what do I know about X" — and as the spouse/household read in smart behaviors #1 and #2.
 - `PATCH /api/agent/people/{id}` — writable: `name`, `email`, `phone`, `address`, `important_dates`, `reminder`, `relationship`, `topics`, `pinned_at`.
 - `DELETE /api/agent/people/{id}?confirm=true` — cascades.
 
-### Moments (timestamped observations; triggers AI reminder analysis)
-- `GET /api/agent/moments?personId=&relationshipId=&since=&until=&limit=&offset=`
-- `POST /api/agent/moments` — body: `{ person_id | relationship_id, content, created_at?, skip_ai_analysis? }`. Exactly one of `person_id` / `relationship_id`. Returns `{ moment, ai_analysis_queued }`, 201.
+### Moments (timestamped observations about people; triggers AI reminder analysis)
+- `GET /api/agent/moments?personId=&since=&until=&limit=&offset=`
+- `POST /api/agent/moments` — body: `{ person_id, content, created_at?, skip_ai_analysis? }`. Returns `{ moment, ai_analysis_queued }`, 201.
 - `GET /api/agent/moments/{id}` — returns `{ moment, images, ai_reminders }`.
 - `PATCH /api/agent/moments/{id}` — only `content` mutable.
 - `DELETE /api/agent/moments/{id}?confirm=true`
 
-### Things to remember (durable, non-timestamped facts)
-- `GET /api/agent/things-to-remember?personId=&relationshipId=`
-- `POST /api/agent/things-to-remember` — `{ person_id | relationship_id, content }`
+### Things to remember (durable, non-timestamped facts about people)
+- `GET /api/agent/things-to-remember?personId=`
+- `POST /api/agent/things-to-remember` — `{ person_id, content }`
 - `GET|PATCH|DELETE /api/agent/things-to-remember/{id}` — PATCH body `{ content }`.
 
 ### AI reminders
@@ -114,12 +114,6 @@ Two sources: `moment` (AI-generated) and `manual` (one-offs via POST). Reminders
 - `PATCH /api/agent/ai-reminders/{id}` — update any subset of `status`, `due_at`, `message`, `notes`, `person_id`, `project_id`, `rationale`. Pass `person_id: null` / `project_id: null` to detach, `notes: null` / `""` to clear.
 
 **For relative due times** (e.g. "remind me in 10 minutes"), use `./scripts/get-time.sh "+10 minutes"` to compute the ISO UTC `due_at` — never do timezone math by hand.
-
-### Relationships
-- `GET|POST /api/agent/relationships` — POST body `{ name, notes, reminder }`.
-- `GET|PATCH|DELETE /api/agent/relationships/{id}` — PATCH writable: `name`, `notes`, `reminder`.
-- `POST /api/agent/relationships/{id}/members` — `{ person_id }`.
-- `DELETE /api/agent/relationships/{id}/members/{personId}?confirm=true`
 
 ### Connection groups
 The **only** way to link people together (couples, families, teams, friend circles). When Matt says "link Sam to John" or "link Eli's friend Jake", find an existing group or create one and add both members. Each member can carry an optional `role` ("spouse", "child", "parent", "sibling", etc.).
@@ -203,7 +197,7 @@ Matt: "Link Sam to John" / "Link my sister's husband to her" / "Link Eli's frien
 
 ## Other common operations (quick reference)
 
-- **"What do I know about Sarah?"** → `GET /people?q=sarah` → `GET /people/{id}` (returns moments, things-to-remember, reminders, lists, groups, relationships, articles, ai_summary in one call).
+- **"What do I know about Sarah?"** → `GET /people?q=sarah` → `GET /people/{id}` (returns moments, things-to-remember, reminders, lists, groups, articles, ai_summary in one call).
 - **Look up a birthday:** `GET /people?q=...` → `GET /people/{id}` → scan `important_dates`.
 - **Add a durable fact about someone:** resolve id → `POST /things-to-remember` with `{ person_id, content }`.
 - **Set/update a member's role in a group:** `PATCH /connection-groups/{groupId}/members/{personId}` with `{ "role": "spouse" }` or `{ "role": null }` to clear.
