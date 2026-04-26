@@ -1,6 +1,6 @@
 ---
 name: nexo-prm
-description: Use when the user wants to read or write their personal relationship data in NexoPRM — people, moments (timestamped observations about someone), things to remember, AI reminders, relationships, lists, connection groups (the way to link people together), working notes (plans/todos), areas of focus, meals, food log, groceries, home items (household chores/maintenance), or stash (pocket knowledge base for non-person facts like products, places, gate codes). Also handles "debrief" — a read-only roll-up of open todos across home, groceries, and the current plan. Invoke for requests like "log that Sarah mentioned X", "who is Alex's birthday", "add milk to my groceries", "what's on my plan", "link Sam to John", "remind me that Jamie prefers texting", "remember that I like Reach floss", "save this cafe", "debrief me", or "what are my open todos". Calls the NexoPRM Agent API at app.nexoprm.com. Runs in a forked subagent — when invoking, pass the user's full intent as the argument (e.g. `Add 'Coke Zero 12-pack' to Matt's grocery list`), since this skill has no access to conversation history.
+description: Use when the user wants to read or write their personal relationship data in NexoPRM — people, moments (timestamped observations about someone), things to remember, AI reminders, lists, connection groups (the way to link people together), working notes (plans/todos), areas of focus, meals, food log, groceries, home items (household chores/maintenance), or stash (pocket knowledge base for non-person facts like products, places, gate codes). Also handles "debrief" — a read-only roll-up of open todos across home, groceries, and the current plan. Invoke for requests like "log that Sarah mentioned X", "who is Alex's birthday", "add milk to my groceries", "what's on my plan", "link Sam to John", "remind me that Jamie prefers texting", "remember that I like Reach floss", "save this cafe", "debrief me", or "what are my open todos". Calls the NexoPRM Agent API at app.nexoprm.com. Runs in a forked subagent — when invoking, pass the user's full intent as the argument (e.g. `Add 'Coke Zero 12-pack' to Matt's grocery list`), since this skill has no access to conversation history.
 context: fork
 ---
 
@@ -84,23 +84,28 @@ All list endpoints accept `limit` (default 50, max 200) and `offset` (default 0)
 Read-only roll-up of the user's whole state. Use for open-ended prompts ("debrief me", "what's going on", "catch me up") and as grounded context before answering anything broad. Window is ~14 days forward; 7 days back for recent moments.
 - `GET /api/agent/briefing` — no query params. Response top-level keys: `generated_at`, `window_days`, `user`, `pillars`, `goals`, `trigger_list`, `upcoming_important_dates`, `ai_reminders` (`{ overdue, upcoming, recently_done }`), `working_note_reminders`, `working_notes`, `things_to_remember`, `recent_moments`, `pinned_people`, `stale_people`, `pinned_lists`, `connection_groups`, `food_log`, `grocery_items`, `home_items`, `meal_plans`. Drill into dedicated endpoints only when you need more than the briefing contains.
 
+### Snapshots (before-state capture)
+Read-only. Every destructive agent write (DELETE, PATCH, PUT) creates a snapshot capturing the before-state. For deletes, cascade children are also snapshotted.
+- `GET /api/agent/snapshots?resourceType=&resourceId=&limit=&offset=` — list snapshots. Filter by resource type or id.
+- `GET /api/agent/snapshots/{id}` — retrieve full snapshot including original row data and cascade-deleted children.
+
 ### People
 - `GET /api/agent/people?q=&limit=&offset=` — search by name/email/phone substring.
 - `POST /api/agent/people` — only `name` required. Other fields: `email`, `phone`, `address`, `important_dates` (array of `{label, date, recurring}`), `relationship` (`{connectionType}`), `topics` (string array), `pinned_at`.
-- `GET /api/agent/people/{id}` — **THE endpoint for learning everything about a person in one call.** Returns `person` + `moments` (up to 100, each with `images`) + `things_to_remember` + `lists` + `connection_groups` + `relationships` (couple/family groups) + `saved_articles` + `ai_reminders` (up to 100, all statuses) + `ai_summary`. Use this for "what do I know about X" or "catch me up on Sarah" queries.
+- `GET /api/agent/people/{id}` — **THE endpoint for learning everything about a person in one call.** Returns `person` + `moments` (up to 100, each with `images`) + `things_to_remember` + `lists` + `connection_groups` + `saved_articles` + `ai_reminders` (up to 100, all statuses) + `ai_summary`. Use this for "what do I know about X" or "catch me up on Sarah" queries.
 - `PATCH /api/agent/people/{id}` — writable: `name`, `email`, `phone`, `address`, `important_dates`, `reminder`, `relationship`, `topics`, `pinned_at`.
 - `DELETE /api/agent/people/{id}?confirm=true` — cascades.
 
-### Moments (timestamped observations; triggers AI reminder analysis)
-- `GET /api/agent/moments?personId=&relationshipId=&since=&until=&limit=&offset=`
-- `POST /api/agent/moments` — body: `{ person_id | relationship_id, content, created_at?, skip_ai_analysis? }`. Exactly one of `person_id` / `relationship_id`. Returns `{ moment, ai_analysis_queued }`, 201.
+### Moments (timestamped observations about people; triggers AI reminder analysis)
+- `GET /api/agent/moments?personId=&since=&until=&limit=&offset=`
+- `POST /api/agent/moments` — body: `{ person_id, content, created_at?, skip_ai_analysis? }`. Returns `{ moment, ai_analysis_queued }`, 201.
 - `GET /api/agent/moments/{id}` — returns `{ moment, images, ai_reminders }`.
 - `PATCH /api/agent/moments/{id}` — only `content` mutable.
 - `DELETE /api/agent/moments/{id}?confirm=true`
 
-### Things to remember (durable, non-timestamped facts)
-- `GET /api/agent/things-to-remember?personId=&relationshipId=`
-- `POST /api/agent/things-to-remember` — `{ person_id | relationship_id, content }`
+### Things to remember (durable, non-timestamped facts about people)
+- `GET /api/agent/things-to-remember?personId=`
+- `POST /api/agent/things-to-remember` — `{ person_id, content }`
 - `GET|PATCH|DELETE /api/agent/things-to-remember/{id}` — PATCH body `{ content }`.
 
 ### AI reminders
@@ -109,12 +114,6 @@ Two sources: `moment` (AI-generated from a moment) and `manual` (agent-created o
 - `POST /api/agent/ai-reminders` — create a one-off manual reminder. Required: `due_at`, `message`. Optional: `notes`, `person_id`, `project_id`, `category`, `rationale`, `status`. Stored with `source='manual'`, `moment_id=null`. `message` is the concise, actionable reminder text shown everywhere (in-app headline, ICS SUMMARY/DESCRIPTION, email subject). `rationale` (optional) is short "why this reminder exists" context shown beneath the headline—use when the reason isn't obvious from `message` alone. `notes` is for longer free-form details. Set `project_id` for multi-week thread reminders (e.g., "order flowers" in Mother's Day project); set `person_id` for person-specific; set both when applicable.
 - `GET /api/agent/ai-reminders/{id}` — response includes `source`; manual reminders have `moment_id=null`.
 - `PATCH /api/agent/ai-reminders/{id}` — update any subset of `status`, `due_at`, `message`, `notes`, `person_id`, `project_id`, `rationale`. Pass `person_id: null` or `project_id: null` to detach, or `notes: null`/`""` to clear notes. Works for both moment-sourced and manual reminders.
-
-### Relationships
-- `GET|POST /api/agent/relationships` — POST body `{ name, notes, reminder }`.
-- `GET|PATCH|DELETE /api/agent/relationships/{id}` — PATCH writable: `name`, `notes`, `reminder`.
-- `POST /api/agent/relationships/{id}/members` — `{ person_id }`.
-- `DELETE /api/agent/relationships/{id}/members/{personId}?confirm=true`
 
 ### Lists
 Lightweight named rosters for action. Use lists for scanning/filtering (e.g. "Active babysitters", "Christmas cards", "People to invite to barbecue"). No shared notes, no shared dates, no per-member roles. If the collection would benefit from shared context, use a connection group instead.
@@ -209,14 +208,16 @@ Multi-week initiatives (job searches, holiday planning, training plans). Each ha
 
 Each note has a `kind` — `note` (regular observation) or `reflection` (distilled lesson). Notes are fully editable after creation. When user asks "what did I learn from X?", filter notes by `kind=reflection`.
 
+**Per-note tags:** Each note can have its own tags for slicing long project timelines by cycle/phase. Canonical use case: perpetual projects (e.g., yearly father-son trip) where you tag each cycle's notes with the year (`2026`, `2027`) to filter without splitting projects. Tags are lowercase; tag pool is per-project. Pass `tags: string[]` on POST/PATCH (replaces full set; `[]` clears). `GET /projects/{id}` returns `note_tags` (aggregate list of all distinct tags used across all notes in this project).
+
 - `GET /api/agent/projects?tag=&include=archived` — list. Excludes archived by default. `?tag=mothers-day` filters case-insensitive.
-- `POST /api/agent/projects` — create. Required: `title`. Optional: `description`, `pillar` (`family`/`relationships`/`health`/`ambitions`), `target_date`, `tags`.
+- `POST /api/agent/projects` — create. Required: `title`. Optional: `description`, `overview_notes`, `pillar` (`family`/`relationships`/`health`/`ambitions`), `target_date`, `tags`.
 - `GET /api/agent/projects/tags` — distinct tags across non-archived projects with counts. Use for autocompletion/discovery.
-- `GET /api/agent/projects/{id}` — full detail in one call — `project`, `notes` (each with `images`), `actions`, `linked_people`, `reminders` (open first by `due_at`, then handled).
-- `PATCH /api/agent/projects/{id}` — partial update. Pin/unpin via `pinned_at` (ISO or null). Archive/unarchive via `archived_at` (ISO or null).
+- `GET /api/agent/projects/{id}` — full detail in one call — `project` (includes `note_tags` aggregate), `notes` (each with `images` and `tags`), `actions`, `linked_people`, `reminders` (open first by `due_at`, then handled).
+- `PATCH /api/agent/projects/{id}` — partial update. Pin/unpin via `pinned_at` (ISO or null). Archive/unarchive via `archived_at` (ISO or null). Update `overview_notes` for big-picture context.
 - `DELETE /api/agent/projects/{id}?confirm=true` — cascades to notes, actions, images, reminders.
-- `POST /api/agent/projects/{id}/notes` — add note. Required: `content`. Optional: `kind` (`note` default, or `reflection`), `image_urls`, `created_at`.
-- `PATCH /api/agent/projects/{id}/notes/{noteId}` — edit content/kind; `add_image_urls`, `remove_image_ids`. Fully editable.
+- `POST /api/agent/projects/{id}/notes` — add note. Required: `content`. Optional: `kind` (`note` default, or `reflection`), `tags` (string array), `image_urls`, `created_at`.
+- `PATCH /api/agent/projects/{id}/notes/{noteId}` — edit content/kind/tags; `add_image_urls`, `remove_image_ids`. Pass `tags: []` to clear all tags. Fully editable.
 - `DELETE /api/agent/projects/{id}/notes/{noteId}?confirm=true`
 - `POST /api/agent/projects/{id}/actions` — add next-action. Required: `content`. Optional: `due_date`.
 - `PATCH /api/agent/projects/{id}/actions/{actionId}` — edit content/due/sort or mark done via `done_at` (ISO or null).
@@ -226,7 +227,9 @@ Each note has a `kind` — `note` (regular observation) or `reflection` (distill
 
 **When to use `reflection` vs `note`:** note = "what happened" (raw observation). reflection = "the lesson" (distilled takeaway). Filter to reflections when user looks back across time.
 
-**Tag handling:** tags stored lowercase; case-insensitive dedup. `?tag=` filter is also case-insensitive.
+**Tag handling (project-level):** tags stored lowercase; case-insensitive dedup. `?tag=` filter is also case-insensitive.
+
+**Per-note tags use case:** For recurring projects (e.g., Annual Father-Son Trip), tag each year's notes with that year (`["2026"]`, `["2027"]`) so you can review just one cycle later without creating separate projects.
 
 ### Reports (read-only rollups)
 Rollup views that answer "show me everyone who matches X" without chaining multiple queries. Use when the user wants a **list**, not a briefing.
@@ -766,7 +769,7 @@ When user asks "what did I learn from X?", filter notes by `kind=reflection`.
 
 ## Other common operations (quick reference)
 
-- **"What do I know about Sarah?"** → `GET /people?q=sarah` to resolve id, then `GET /people/{id}` — returns everything (moments, things-to-remember, reminders, lists, groups, relationships, articles, ai_summary) in one call.
+- **"What do I know about Sarah?"** → `GET /people?q=sarah` to resolve id, then `GET /people/{id}` — returns everything (moments, things-to-remember, reminders, lists, groups, articles, ai_summary) in one call.
 - **Look up a birthday:** `GET /people?q=...` → `GET /people/{id}` → scan `important_dates`.
 - **Link two people:** resolve both ids → `GET /connection-groups` to find existing group or `POST /connection-groups` to create → `POST /connection-groups/{id}/members` with `{ person_id, role? }` for each. See Flow F.
 - **Set/update a member's role in a group:** `PATCH /connection-groups/{groupId}/members/{personId}` with `{ "role": "spouse" }` or `{ "role": null }` to clear.
