@@ -29,6 +29,20 @@ The work splits into two big buckets:
 
 This is correct for one trusted user on his own VPS. It is **not safe or scalable** for a public bot in any of those properties.
 
+### "Do I need multiple agents running?" — yes, but probably not the way you're picturing
+
+Three layers worth separating, because they're often conflated:
+
+1. **Concurrent `query()` calls.** Yes, definitely. If two users message at the same moment you can't serially process them. Each `query()` call already spawns its own `claude` subprocess under the hood, so "multiple agents running" is already true today every time you message Nexo — there's just only ever one in flight. The Node orchestrator just needs to fire them off concurrently, which is free (it's all async).
+
+2. **Number of orchestrator processes.** This is the real architectural choice:
+   - **One Node process** can supervise many concurrent `query()` calls. Fine until you hit memory pressure or the event loop saturates from streaming I/O of dozens of in-flight queries. Probably good for the first hundred or low-thousands of light users.
+   - **Worker pool of N Node processes** behind a queue is what you grow into. Each worker pulls a job, runs a `query()`, replies, picks up the next. Scales horizontally, survives crashes, lets you deploy new versions without dropping in-flight conversations.
+
+3. **Process-level isolation per user.** This is the security question, separate from scale. Even though each `query()` is its own subprocess, they all share your VPS's filesystem and the cwd you give them. If you keep `bypassPermissions` on, user A's agent could read user B's stuff. Two ways out: strip the dangerous tools (no Bash/Read/Write — same agent code becomes safe for everyone), or run each query in a container with a per-user working directory. The first is way cheaper; the second is what you'd need if public users ever get shell or filesystem access.
+
+You don't need to spawn "an agent per user" as a long-running thing — Nexo is already mostly stateless between messages (the only persistent state is the session_id). You need (1) for correctness, (2) for scale, and (3) for safety.
+
 ### Decision space — three viable architectures
 
 **(a) Single process, multi-session router.** Keep one Node process. Replace `TELEGRAM_CHAT_ID` filter with a user lookup. Store `session_id` per user in a database instead of `.session-id`. Each `query()` call passes the right `resume`. Cheap, simple, but **shares one filesystem and one OS user across all tenants** — you cannot keep `bypassPermissions` on. Tooling has to be locked down to API-only skills (no Bash, no Read/Write). Hard ceiling on concurrency too — one Node loop is fine for low usage but doesn't scale horizontally without coordination.
