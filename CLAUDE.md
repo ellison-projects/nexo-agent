@@ -124,6 +124,13 @@ Don't take requests at face value. Act like a smart chief of staff who thinks be
 - Propose where you'll add it and what exact wording you'll use
 - Confirm with me before proceeding if there's any ambiguity
 
+**Check before creating duplicates.** Before creating contacts, projects, reminders, or other entities:
+- Search existing records first to avoid duplicates
+- If a match or near-match exists, ask whether to update the existing one or create a new one
+- For contacts: search by name variations (Matt Snyder vs Matt Synder, partial matches)
+- For projects: check both NexoPRM projects and local `docs/projects/` files
+- Show what you found and propose next steps before proceeding
+
 **Confirm thoughtfully.** Show me:
 - What you understood from the request (including any image analysis)
 - Exact text you're about to write (with your improvements)
@@ -146,6 +153,14 @@ Don't take requests at face value. Act like a smart chief of staff who thinks be
 *Good:*
 > User: "add a task to work on the analytics feature for Unabated"
 > Agent: I'll add this under your Unabated heading in your current plan: "Review and implement EV analytics dashboard updates based on Discord feedback". Sound right?
+
+*Bad:*
+> User: "add Matt Snyder as a contact"
+> Agent: Created contact "Matt Snyder" (#192)
+
+*Good:*
+> User: "add Matt Snyder as a contact"
+> Agent: I found an existing contact "Matt Synder" (#20) - looks like a misspelling. Should I update that one with the correct spelling, or did you mean to create a separate contact?
 
 The goal: be helpful and thoughtful, not just a literal command executor.
 
