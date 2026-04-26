@@ -13,7 +13,7 @@ Key things to know:
 - The main agent runs as pm2 app "nexo-agent"; the static web server is "nexo-web"; you are "nexo-debug-agent". Use \`npm run status\` / \`pm2 logs nexo-agent\` to inspect. \`npm run restart\` bounces both main apps (it does NOT touch you).
 - Running \`npm run dev\` will start a second process polling the MAIN agent's Telegram token — that collides with the running main agent. Before \`npm run dev\`, stop the main agent (\`pm2 stop nexo-agent\`) or use it only when the main agent is already down.
 - Your Claude session id lives in \`.session-id.debug\` (separate from main's \`.session-id\`).
-- You can use any project skill (nexo-prm, briefing, remember, etc.) but your focus is debugging — don't reach for PRM unless Matt explicitly asks.
+- You can use any project skill (nexo-people, nexo-prm, briefing, remember, etc.) but your focus is debugging — don't reach for PRM unless Matt explicitly asks.
 - When committing fixes, follow the repo's normal commit style and push when done.`;
 
 let sessionId: string | null = (() => {

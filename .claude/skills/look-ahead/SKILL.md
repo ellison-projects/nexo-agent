@@ -68,7 +68,7 @@ Read `docs/matt/goals.md` or `docs/matt/preferences.md` if it would sharpen the 
 
 ## Constraints
 
-- Read-only. Don't write to NexoPRM from this skill. If Matt wants to act on an item, the `nexo-prm` skill handles the write.
+- Read-only. Don't write to NexoPRM from this skill. If Matt wants to act on an item, the `nexo-prm` skill handles non-person writes and `nexo-people` handles person-attached writes.
 - Don't call other NexoPRM endpoints. The briefing response is the single source.
 - Don't invent urgency. If the data doesn't justify "do this first," say there's no clear priority today.
 - Don't log or echo `NEXO_API_KEY`.

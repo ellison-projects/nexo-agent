@@ -6,7 +6,7 @@ context: fork
 
 # Refresh API docs
 
-Pulls a fresh copy of the NexoPRM Agent API documentation into the repo so the `nexo-prm` skill (and the agent in general) is reasoning against current endpoint shapes. This skill is the canonical spec for the snapshot mechanics — filename format, source URLs, alias copies, diff, and commit/push.
+Pulls a fresh copy of the NexoPRM Agent API documentation into the repo so the `nexo-people` and `nexo-prm` skills (and the agent in general) are reasoning against current endpoint shapes. This skill is the canonical spec for the snapshot mechanics — filename format, source URLs, alias copies, diff, and commit/push.
 
 ## Your task
 
@@ -22,7 +22,7 @@ Trigger on requests like:
 - "snapshot the nexo api" / "snapshot llm.md"
 - "are the api docs current?"
 - "check what changed in the api"
-- After the `nexo-prm` skill hits an unexpected 404 or `validation_error` and you suspect the API moved out from under the docs.
+- After the `nexo-people` or `nexo-prm` skill hits an unexpected 404 or `validation_error` and you suspect the API moved out from under the docs.
 
 If Matt asks a one-off API question that the existing `docs/api-snapshots/llm.md` already answers, do **not** trigger this skill — just read the file. This skill is for refreshing, not for lookups.
 
@@ -31,7 +31,7 @@ If Matt asks a one-off API question that the existing `docs/api-snapshots/llm.md
 - Location: `docs/api-snapshots/` (tracked in git).
 - Reference docs filename: `llm-YYYY-MM-DD-HHMMSS.md` (UTC). Example: `llm-2026-04-19-143045.md`.
 - Features summary filename: `features-YYYY-MM-DD-HHMMSS.md` (same convention).
-- Aliases: `docs/api-snapshots/llm.md` and `docs/api-snapshots/features.md` always point at the most recent snapshot (overwritten on every refresh). These are what the `nexo-prm` skill and other readers should consult by default.
+- Aliases: `docs/api-snapshots/llm.md` and `docs/api-snapshots/features.md` always point at the most recent snapshot (overwritten on every refresh). These are what the `nexo-people` and `nexo-prm` skills and other readers should consult by default.
 
 ## Flow
 
@@ -78,7 +78,7 @@ Features (product summary):
 - New: <one-liner>
 
 Worth your attention:
-<1–2 sentences. Flag anything the `nexo-prm` skill's SKILL.md likely needs to mirror, or anything that breaks current agent behavior.>
+<1–2 sentences. Flag anything the `nexo-people` or `nexo-prm` skill's SKILL.md likely needs to mirror, or anything that breaks current agent behavior.>
 ```
 
 If the diff is empty, say so plainly: *"No changes since `<prior timestamp>`."* Don't fabricate a summary.
@@ -98,7 +98,7 @@ Retry push up to 4 times with exponential backoff (2s, 4s, 8s, 16s) on network f
 
 If the diff was empty (no changes since prior), still commit — the new timestamped file is itself a useful "we checked, nothing changed" data point. Keep the commit message but add ` (no changes)` so future-you can scan past it.
 
-**Step 6. Flag follow-ups.** If the diff suggests `.claude/skills/nexo-prm/SKILL.md` is now stale (e.g. an endpoint was added, removed, or its body schema changed), say so explicitly and offer to update it. Don't update it silently — that's a separate confirmed action.
+**Step 6. Flag follow-ups.** If the diff suggests `.claude/skills/nexo-people/SKILL.md` or `.claude/skills/nexo-prm/SKILL.md` is now stale (e.g. an endpoint was added, removed, or its body schema changed), say so explicitly and offer to update it. Don't update it silently — that's a separate confirmed action.
 
 ## Constraints
 

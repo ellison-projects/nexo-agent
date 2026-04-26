@@ -77,7 +77,7 @@ Read `docs/matt/goals.md` if patterns need framing against longer-term prioritie
 
 ## Constraints
 
-- Read-only. If Matt wants to close something or add a note in response, the `nexo-prm` skill handles the write.
+- Read-only. If Matt wants to close something or add a note in response, the `nexo-prm` skill handles non-person writes and `nexo-people` handles person-attached writes.
 - Don't call other NexoPRM endpoints to enrich the view — the briefing response plus snapshot history is the full source.
 - Don't manufacture patterns. If the window is too short or the snapshots too sparse to say anything confident, say that instead.
 - Don't log or echo `NEXO_API_KEY`.
