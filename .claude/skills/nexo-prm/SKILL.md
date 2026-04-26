@@ -48,9 +48,10 @@ Base URL: `https://app.nexoprm.com`
    - 2+ matches → present candidates with distinguishing info (email/phone/relationship) and wait for the user to pick
    - Never guess a person id.
 4. Prefer `PATCH` over recreate; most updates are idempotent.
-5. **When unsure, ask first.** If a name is ambiguous, the content of a moment/item is unclear, or the right endpoint isn't obvious, confirm with the user before writing.
-6. **Always report back what you updated.** After every successful write, tell the user in one line what changed and on which record — include the person/list/note name and the id. Example: *"Logged moment #812 on Sarah Chen (#42)."* / *"Added 'milk' (#3041) to groceries list #17."* If the write failed, say what went wrong and what you did (or didn't do).
-7. **When disambiguating people, show ids.** List each candidate with its id so the user can pick unambiguously. Example: *"I have two Sams — #42 Sam Rivera (sam@example.com), #88 Sam Okafor (+1 555-0134). Which one?"*
+5. **CRITICAL: If any API endpoint fails (non-2xx response), STOP immediately and report the failure.** Include the endpoint, method, status code, and error response. Do NOT continue attempting other operations - the user will fix the issue before proceeding.
+6. **When unsure, ask first.** If a name is ambiguous, the content of a moment/item is unclear, or the right endpoint isn't obvious, confirm with the user before writing.
+7. **Always report back what you updated.** After every successful write, tell the user in one line what changed and on which record — include the person/list/note name and the id. Example: *"Logged moment #812 on Sarah Chen (#42)."* / *"Added 'milk' (#3041) to groceries list #17."* If the write failed, say what went wrong and what you did (or didn't do).
+8. **When disambiguating people, show ids.** List each candidate with its id so the user can pick unambiguously. Example: *"I have two Sams — #42 Sam Rivera (sam@example.com), #88 Sam Okafor (+1 555-0134). Which one?"*
 
 ## Error shape
 
