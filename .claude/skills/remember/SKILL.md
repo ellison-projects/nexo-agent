@@ -1,6 +1,6 @@
 ---
 name: remember
-description: Use when Matt wants to save a durable fact into the repo — project knowledge, his own preferences/goals, tooling notes, or anything else that belongs in git rather than NexoPRM. Triggered by phrases like "remember that X", "note that X", "save that X", "make a note X", "jot down X". For facts about a specific person (moments, things-to-remember tied to someone) defer to the `nexo-prm` skill instead — those belong in PRM, not git. **Runs in a forked subagent with no conversation history.** Before invoking, the calling agent must (1) clean up the wording, (2) pick the destination using the decision tree in the skill body, (3) confirm both with Matt, then (4) invoke the skill with a fully-specified argument of the form `<cleaned fact> | <destination file path> | <heading>`, where `<heading>` is either an existing or desired heading name (e.g. `## People`) or the exact sentinel `new file` (unquoted) to create the destination. The `|` character is reserved as the field separator — it must not appear inside any field. The skill itself does the file write + commit + push and nothing else.
+description: Use when Matt wants to save a durable fact into the repo — project knowledge, his own preferences/goals, tooling notes, or anything else that belongs in git rather than NexoPRM. Triggered by phrases like "remember that X", "note that X", "save that X", "make a note X", "jot down X". For facts about a specific person (moments, things-to-remember tied to someone) defer to the `nexo-people` skill instead — those belong in PRM, not git. **Runs in a forked subagent with no conversation history.** Before invoking, the calling agent must (1) clean up the wording, (2) pick the destination using the decision tree in the skill body, (3) confirm both with Matt, then (4) invoke the skill with a fully-specified argument of the form `<cleaned fact> | <destination file path> | <heading>`, where `<heading>` is either an existing or desired heading name (e.g. `## People`) or the exact sentinel `new file` (unquoted) to create the destination. The `|` character is reserved as the field separator — it must not appear inside any field. The skill itself does the file write + commit + push and nothing else.
 context: fork
 ---
 
@@ -44,7 +44,7 @@ Caller-supplied argument: $ARGUMENTS
 
 Walk this top-to-bottom and stop at the first match:
 
-1. **About a tracked person and the fact is personal/relational** → `nexo-prm` skill, not this skill. If you see args pointing here for a case like this, return an error.
+1. **About a tracked person and the fact is personal/relational** → `nexo-people` skill, not this skill. If you see args pointing here for a case like this, return an error.
 2. **About a project or work context** → `docs/projects/<project-slug>.md`.
    - Slugify the project name: lowercase, dashes (e.g. "Declassified" → `declassified`, "Nexo PRM" → `nexo-prm`).
    - File may not exist yet — caller should pass `new file` as the heading in that case; create with an `# <Project Name>` top heading and append the fact under a first subheading.
