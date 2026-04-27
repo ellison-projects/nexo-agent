@@ -1,0 +1,5 @@
+{
+  "name": "lighthouse-audit",
+  "description": "Use to run Lighthouse performance audits on websites and get detailed scores. Triggers: 'lighthouse audit', 'check performance scores', 'run lighthouse on [url]', 'pagespeed test', 'performance audit'. Runs with context: fork.",
+  "context": "fork"
+}
