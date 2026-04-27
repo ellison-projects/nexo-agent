@@ -55,7 +55,7 @@ You don't need to spawn "an agent per user" as a long-running thing — Nexo is 
 
 ### Switching long-poll → webhook
 
-`getUpdates` long-poll is fine for one user; for a public bot you want webhooks so Telegram fans out updates to your worker pool directly. `skipBacklog()` and the `.session-id` file both go away. Note: webhooks need a public HTTPS endpoint with a valid cert (or use Telegram's self-signed support).
+`getUpdates` long-poll is fine for one user; for a public bot you want webhooks so Telegram fans out updates to your worker pool directly. `skipBacklog()` and the `.session-id` file both go away. Note: webhooks need a public HTTPS endpoint with a CA-signed cert, or a self-signed cert uploaded to Telegram via `setWebhook`.
 
 ### Session storage
 
