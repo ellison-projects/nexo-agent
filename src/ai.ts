@@ -37,7 +37,7 @@ export async function askNexo(
       const response = query({
             prompt,
             options: {
-                  model: 'sonnet',
+                  model: 'haiku',
                   cwd: AGENT_CWD,
                   systemPrompt: {
                         type: 'preset',
