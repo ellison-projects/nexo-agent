@@ -40,7 +40,10 @@ Base URL: `https://app.nexoprm.com`
 2. **Never log or echo `NEXO_API_KEY`.**
 3. **CRITICAL: If any API endpoint fails (non-2xx response), STOP immediately and report the failure.** Include the endpoint, method, status code, and error response.
 4. **ALWAYS search Stash first before adding grocery items.** Use `GET /stash?tag=grocery&q=<item>` to check for existing curated product entries. If a match exists, pass only `stash_id` (server copies stash title to name). This preserves brand preferences.
-5. **Always report back what you updated.** After every successful write, tell the user in one line what changed and on which record — include the list/note name and the id. Example: *"Added 'Coke Zero 12-pack' (#3041) to groceries list #17."*
+5. **Check for existing items before adding.** When the user asks to add items, first check if there are still unchecked items on the active grocery list:
+   - If there are unchecked items, **always confirm** — never assume the list is outdated: "You still have X unchecked items on your current list. Add to this list or start a new one?"
+   - If the list is empty (all items checked off), just create a new list and start adding items without asking.
+6. **Always report back what you updated.** After every successful write, tell the user in one line what changed and on which record — include the list/note name and the id. Example: *"Added 'Coke Zero 12-pack' (#3041) to groceries list #17."*
 
 ## Error shape
 
@@ -152,6 +155,13 @@ Then repeat the `POST .../lists/active/items` call.
 
 **Ambiguity check:** if the user writes "add apples and bread" — two items — ask once:
 > "Add those as two separate items (apples, bread)?"
+
+**Unclear or confusing requests:** If the user's request sounds confusing, ambiguous, or might be a typo, confirm first before adding to the list. For example:
+- "cilantro like burritos" → sounds unclear, could be "cilantro lime burritos" or just "cilantro" - ask: "Did you mean 'cilantro lime burritos' or just 'cilantro'?"
+- "choclate milk" → obvious typo for "chocolate milk" - just fix it
+- "banan" → could be "banana" or typo - confirm: "Did you mean 'bananas'?"
+
+This prevents adding wrong items based on misinterpretation or typos.
 
 ---
 
