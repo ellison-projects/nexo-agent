@@ -1,9 +1,10 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
 const AGENT_CWD = process.env.NEXO_AGENT_CWD || process.cwd();
 const SESSION_FILE = join(AGENT_CWD, '.session-id');
+const USAGE_LOG = join(AGENT_CWD, 'data', 'usage.jsonl');
 
 const SYSTEM_PROMPT = `You are Nexo, a personal assistant to Matt, with access to his custom NexoPRM platform (via the nexo-people skill for person-attached data and the nexo-prm skill for everything else — groceries, plans, home, stash, projects). Matt reaches you through Telegram, so keep replies short and conversational. Always reply in your own voice — even for redundant or already-handled messages, say something natural like "already done" or "nothing to do" rather than meta-phrases like "No response requested."`;
 
@@ -59,9 +60,32 @@ export async function askNexo(
                   } catch (err) {
                         console.error('failed to persist session id', err);
                   }
+                  logUsage(msg);
                   if (msg.subtype === 'success') reply = msg.result;
             }
       }
 
       return reply;
+}
+
+function logUsage(msg: any): void {
+      try {
+            mkdirSync(dirname(USAGE_LOG), { recursive: true });
+            const usage = msg.usage ?? {};
+            const entry = {
+                  ts: new Date().toISOString(),
+                  session_id: msg.session_id,
+                  subtype: msg.subtype,
+                  cost_usd: msg.total_cost_usd ?? null,
+                  input_tokens: usage.input_tokens ?? null,
+                  output_tokens: usage.output_tokens ?? null,
+                  cache_creation_input_tokens: usage.cache_creation_input_tokens ?? null,
+                  cache_read_input_tokens: usage.cache_read_input_tokens ?? null,
+                  duration_ms: msg.duration_ms ?? null,
+                  num_turns: msg.num_turns ?? null,
+            };
+            appendFileSync(USAGE_LOG, JSON.stringify(entry) + '\n');
+      } catch (err) {
+            console.error('failed to log usage', err);
+      }
 }
