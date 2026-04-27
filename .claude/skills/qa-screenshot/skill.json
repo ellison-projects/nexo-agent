@@ -1,0 +1,5 @@
+{
+  "name": "qa-screenshot",
+  "description": "Use to capture visual QA screenshots of websites at multiple device sizes. Triggers: 'take screenshots of [url]', 'capture screenshots for [site]', 'qa screenshots', 'visual testing screenshots'. Runs with context: fork.",
+  "context": "fork"
+}
