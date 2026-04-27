@@ -17,7 +17,17 @@ export type TelegramPhotoSize = {
 export type TelegramUpdate = {
       update_id: number;
       message?: {
-            chat: { id: number };
+            chat: {
+                  id: number;
+                  type: 'private' | 'group' | 'supergroup' | 'channel';
+            };
+            from?: {
+                  id: number;
+                  is_bot: boolean;
+                  first_name: string;
+                  last_name?: string;
+                  username?: string;
+            };
             text?: string;
             caption?: string;
             photo?: TelegramPhotoSize[];
