@@ -1,16 +1,11 @@
 ---
 name: nexo-grocery
-description: Use for NexoPRM grocery list operations — adding items, checking them off, viewing the list, and managing grocery-related stash entries. Invoke for requests like "add milk to my groceries", "what's on my grocery list", "check off eggs", or "save this grocery item to stash". Always searches Stash first for brand-specific products before adding items. Calls the NexoPRM Agent API at app.nexoprm.com. Runs in a forked subagent — when invoking, pass the user's full intent as the argument (e.g. `Add 'Coke Zero 12-pack' to Matt's grocery list`), since this skill has no access to conversation history.
-context: fork
+description: Use for NexoPRM grocery list operations — adding items, checking them off, viewing the list, and managing grocery-related stash entries. Invoke for requests like "add milk to my groceries", "what's on my grocery list", "check off eggs", or "save this grocery item to stash". Always searches Stash first for brand-specific products before adding items. Calls the NexoPRM Agent API at app.nexoprm.com. Runs inline so it can ask for confirmation when needed.
 ---
 
 # NexoPRM Grocery Skill
 
-## Your task
-
-$ARGUMENTS
-
-Fulfill the grocery-related request above using the NexoPRM API reference below. Report back concisely with what you did (endpoint called, id returned, etc.) or what you found.
+Fulfill grocery-related requests using the NexoPRM API reference below. You have full conversation context and can ask Matt for confirmation or clarification as needed.
 
 ---
 
