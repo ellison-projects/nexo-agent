@@ -1,6 +1,6 @@
 ---
 name: nexo-grocery
-description: Use for NexoPRM grocery list operations — adding items, checking them off, viewing the list, and managing grocery-related stash entries. Invoke for requests like "add milk to my groceries", "what's on my grocery list", "check off eggs", or "save this grocery item to stash". Always searches Stash first for brand-specific products before adding items. Calls the NexoPRM Agent API at app.nexoprm.com. Runs inline so it can ask for confirmation when needed.
+description: Use for grocery list operations — adding items, checking them off, viewing list, managing stash entries. Triggers: "add milk", "what's on my grocery list", "check off eggs", "save to stash". Searches Stash first for brand preferences. Runs inline — can ask for confirmation.
 ---
 
 # NexoPRM Grocery Skill
