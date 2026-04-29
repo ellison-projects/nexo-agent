@@ -1,6 +1,6 @@
 ---
 name: nexo-prm
-description: Use for non-person NexoPRM data — working notes (plans/todos), areas of focus, meals, food log, home items (household chores/maintenance), stash (pocket knowledge base for non-person facts like products, places, gate codes), and projects (multi-week threads). Also handles "debrief" — a read-only roll-up of open todos across home and the current plan. Invoke for requests like "what's on my plan", "remember that I like Reach floss", "save this cafe", "debrief me", or "what are my open todos". **For person-attached data (people, moments, things-to-remember, AI reminders, connection groups, lists, address/phone/email updates), use the `nexo-people` skill instead.** **For grocery operations, use the `nexo-grocery` skill instead.** Calls the NexoPRM Agent API at app.nexoprm.com. Runs in a forked subagent — when invoking, pass the user's full intent as the argument, since this skill has no access to conversation history.
+description: Use for non-person NexoPRM data — working notes (plans/todos), areas of focus, meals, food log, home items (household chores/maintenance), and stash (pocket knowledge base for non-person facts like products, places, gate codes). Also handles "debrief" — a read-only roll-up of open todos across home and the current plan. Invoke for requests like "what's on my plan", "remember that I like Reach floss", "save this cafe", "debrief me", or "what are my open todos". **For person-attached data (people, moments, things-to-remember, AI reminders, connection groups, lists, address/phone/email updates), use the `nexo-people` skill instead.** **For grocery operations, use the `nexo-grocery` skill instead.** **For notebooks/projects (multi-week threads), use the `nexo-notebooks` skill instead.** Calls the NexoPRM Agent API at app.nexoprm.com. Runs in a forked subagent — when invoking, pass the user's full intent as the argument, since this skill has no access to conversation history.
 context: fork
 ---
 
@@ -14,7 +14,7 @@ Fulfill the request above using the NexoPRM API reference below. Report back con
 
 ---
 
-Personal-relationship-manager API. Every request uses a god-mode bearer token plus a per-user impersonation header. This skill covers the **non-person** subset of the API (excluding groceries). For person-attached resources (people, moments, things-to-remember, AI reminders, relationships, connection groups, lists, people reports), see the `nexo-people` skill. For grocery operations, see the `nexo-grocery` skill.
+Personal-relationship-manager API. Every request uses a god-mode bearer token plus a per-user impersonation header. This skill covers the **non-person** subset of the API (excluding groceries and notebooks). For person-attached resources (people, moments, things-to-remember, AI reminders, relationships, connection groups, lists, people reports), see the `nexo-people` skill. For grocery operations, see the `nexo-grocery` skill. For notebooks/projects (multi-week threads), see the `nexo-notebooks` skill.
 
 **Full API reference (source of truth):** https://app.nexoprm.com/agentapi/llm.md — fetch this if an endpoint or field shape isn't covered below, or if a call 404s / rejects unexpectedly (the API may have changed since this skill was last updated).
 
@@ -47,6 +47,7 @@ Base URL: `https://app.nexoprm.com`
 6. **Always report back what you updated.** After every successful write, tell the user in one line what changed and on which record — include the list/note name and the id. Example: *"Added 'milk' (#3041) to groceries list #17."*
 7. **For person-attached operations, defer to `nexo-people`.** If $ARGUMENTS asks you to log a moment, save a thing-to-remember, link people, update a person's contact info, or anything else person-shaped, return a note saying "this belongs in nexo-people" rather than calling those endpoints from here.
 8. **For grocery operations, defer to `nexo-grocery`.** If $ARGUMENTS asks you to add/view/check off grocery items, return a note saying "this belongs in nexo-grocery" rather than calling those endpoints from here.
+9. **For notebook/project operations, defer to `nexo-notebooks`.** If $ARGUMENTS asks you to create notebooks, add notes/reflections to projects, manage next actions, or link people to projects, return a note saying "this belongs in nexo-notebooks" rather than calling those endpoints from here.
 
 ## Error shape
 
@@ -132,36 +133,6 @@ Household maintenance / chores ("replace smoke alarm batteries", "regrout shower
 - `POST /api/agent/home-items/{id}/notes` — `{ content }`. Returns `{ note }`, 201.
 - `PATCH /api/agent/home-item-notes/{noteId}` — writable: `content`.
 - `DELETE /api/agent/home-item-notes/{noteId}?confirm=true`
-
-### Projects
-Multi-week initiatives (job searches, holiday planning, training plans). Each has an editable collection of **notes**, a flat **next-actions** checklist, optional pillar tag, optional target date, freeform tags, and linked people.
-
-**Mental model:** projects are for threads with a lifespan — opens, accumulates notes + actions over weeks/months, quietly fades. One-off events go in moments. Multi-week threads belong on projects.
-
-Each note has a `kind` — `note` (regular observation) or `reflection` (distilled lesson). Notes are fully editable after creation. When user asks "what did I learn from X?", filter notes by `kind=reflection`.
-
-**Per-note tags:** Each note can have its own tags for slicing long project timelines by cycle/phase. Canonical use case: perpetual projects (e.g., yearly father-son trip) where you tag each cycle's notes with the year (`2026`, `2027`) to filter without splitting projects. Tags are lowercase; tag pool is per-project. Pass `tags: string[]` on POST/PATCH (replaces full set; `[]` clears). `GET /projects/{id}` returns `note_tags` (aggregate list of all distinct tags used across all notes in this project).
-
-- `GET /api/agent/projects?tag=&include=archived` — list. Excludes archived by default. `?tag=mothers-day` filters case-insensitive.
-- `POST /api/agent/projects` — create. Required: `title`. Optional: `description`, `overview_notes`, `pillar` (`family`/`relationships`/`health`/`ambitions`), `target_date`, `tags`.
-- `GET /api/agent/projects/tags` — distinct tags across non-archived projects with counts. Use for autocompletion/discovery.
-- `GET /api/agent/projects/{id}` — full detail in one call — `project` (includes `note_tags` aggregate), `notes` (each with `images` and `tags`), `actions`, `linked_people`, `reminders` (open first by `due_at`, then handled).
-- `PATCH /api/agent/projects/{id}` — partial update. Pin/unpin via `pinned_at` (ISO or null). Archive/unarchive via `archived_at` (ISO or null). Update `overview_notes` for big-picture context.
-- `DELETE /api/agent/projects/{id}?confirm=true` — cascades to notes, actions, images, reminders.
-- `POST /api/agent/projects/{id}/notes` — add note. Required: `content`. Optional: `kind` (`note` default, or `reflection`), `tags` (string array), `image_urls`, `created_at`.
-- `PATCH /api/agent/projects/{id}/notes/{noteId}` — edit content/kind/tags; `add_image_urls`, `remove_image_ids`. Pass `tags: []` to clear all tags. Fully editable.
-- `DELETE /api/agent/projects/{id}/notes/{noteId}?confirm=true`
-- `POST /api/agent/projects/{id}/actions` — add next-action. Required: `content`. Optional: `due_date`.
-- `PATCH /api/agent/projects/{id}/actions/{actionId}` — edit content/due/sort or mark done via `done_at` (ISO or null).
-- `DELETE /api/agent/projects/{id}/actions/{actionId}?confirm=true`
-- `POST /api/agent/projects/{id}/people` — link person. `{ "person_id": "..." }`.
-- `DELETE /api/agent/projects/{id}/people/{personId}?confirm=true` — unlink.
-
-**When to use `reflection` vs `note`:** note = "what happened" (raw observation). reflection = "the lesson" (distilled takeaway). Filter to reflections when user looks back across time.
-
-**Tag handling (project-level):** tags stored lowercase; case-insensitive dedup. `?tag=` filter is also case-insensitive.
-
-**Per-note tags use case:** For recurring projects (e.g., Annual Father-Son Trip), tag each year's notes with that year (`["2026"]`, `["2027"]`) so you can review just one cycle later without creating separate projects.
 
 ### Audit log (read-only)
 - `GET /api/agent/audit-log?userId=&since=&action=&resourceType=&limit=&offset=` — returns `{ entries: [...] }`. Bodies stored as SHA-256 digest, not raw.
@@ -377,94 +348,12 @@ curl -s "https://app.nexoprm.com/api/agent/stash?tag=health" \
 
 ---
 
-### Flow D — Add a note to a project (multi-week threads)
-
-**User:** "Note that the interview with Acme went well" or "Add a reflection on Mother's Day planning"
-
-Multi-week threads belong on projects, not moments. Projects are for initiatives with a lifespan (job searches, holiday planning, training plans).
-
-**Step 1. Find or create the project.**
-```bash
-# Search for existing project by tag
-curl -s "https://app.nexoprm.com/api/agent/projects?tag=interview-prep" \
-  -H "Authorization: Bearer $NEXO_API_KEY" \
-  -H "X-Nexo-User: $NEXO_USER"
-```
-
-If no project exists, create one:
-```bash
-curl -s -X POST "https://app.nexoprm.com/api/agent/projects" \
-  -H "Authorization: Bearer $NEXO_API_KEY" \
-  -H "X-Nexo-User: $NEXO_USER" \
-  -H "Content-Type: application/json" \
-  -d '{"title":"Interview prep","tags":["interview-prep"],"pillar":"ambitions"}'
-```
-
-Response (201):
-```json
-{
-  "project": {
-    "id": "42",
-    "title": "Interview prep",
-    "tags": ["interview-prep"],
-    "pillar": "ambitions",
-    "created_at": "2026-04-24T..."
-  }
-}
-```
-
-**Step 2. Add the note.**
-```bash
-curl -s -X POST "https://app.nexoprm.com/api/agent/projects/42/notes" \
-  -H "Authorization: Bearer $NEXO_API_KEY" \
-  -H "X-Nexo-User": $NEXO_USER" \
-  -H "Content-Type: application/json" \
-  -d '{"content":"Acme round 2 went well — they want me owning the platform roadmap.","kind":"note"}'
-```
-
-For "lessons learned" content, use `"kind": "reflection"`:
-```bash
-curl -s -X POST "https://app.nexoprm.com/api/agent/projects/42/notes" \
-  -H "Authorization: Bearer $NEXO_API_KEY" \
-  -H "X-Nexo-User: $NEXO_USER" \
-  -H "Content-Type: application/json" \
-  -d '{"content":"Key lesson: focus on impact metrics, not just features.","kind":"reflection"}'
-```
-
-Expected response (201):
-```json
-{
-  "note": {
-    "id": "812",
-    "project_id": "42",
-    "content": "Acme round 2 went well...",
-    "kind": "note",
-    "created_at": "2026-04-24T..."
-  }
-}
-```
-
-**Step 3. Report back.**
-> "Added note #812 to Interview prep project (#42)."
-
-**Editing notes:** Unlike moments, project notes are editable. If user says "rework that last note to say...", use `PATCH /projects/{id}/notes/{noteId}` with new `content`.
-
-**Reflections vs notes:**
-- `note` = "what happened" (raw observation, written in the moment)
-- `reflection` = "the lesson" (distilled takeaway, written mid-flight or at end)
-
-When user asks "what did I learn from X?", filter notes by `kind=reflection`.
-
----
-
 ## Other common operations (quick reference)
 
 - **Save a non-person fact:** `POST /stash` with `{ "title": "...", "note": "...", "tags": [...] }`. Use for products, places, gate codes, etc.
 - **Check off a plan item:** `GET /working-notes/latest` → find item → `PATCH /working-note-items/{id}` with `{ "checked": true }`.
 - **Add long-form notes to a heading:** `PATCH /working-note-items/{headingId}` with `{ "notes": "Long-form project context here..." }`.
 - **Promote a heading to the top:** `GET /working-notes/latest` → reorder items array (heading + children to front) → `PUT /working-notes/latest/reorder` with `{ "item_ids": [...] }`.
-- **Add a note to a project (multi-week thread):** `GET /projects?tag=<tag>` to find or `POST /projects` to create → `POST /projects/{id}/notes` with `{ "content": "...", "kind": "note" }` (or `"reflection"` for lessons learned). See Flow D.
-- **Pull up reflections from a project:** `GET /projects?tag=<tag>` → `GET /projects/{id}` → filter `notes` array by `kind=reflection`.
 - **Delete anything:** append `?confirm=true`. Only after explicit user intent. Example:
   ```bash
   curl -s -X DELETE "https://app.nexoprm.com/api/agent/home-items/812?confirm=true" \
