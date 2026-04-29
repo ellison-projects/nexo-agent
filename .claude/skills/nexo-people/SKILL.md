@@ -65,6 +65,41 @@ Classify the moment content before posting. If it's a preference, allergy, disli
 > "I'll log that as a moment. Also save 'Allergic to peanuts' as a thing-to-remember on Sarah?"
 If yes, do both writes. Examples that are durable facts: "Sarah's allergic to peanuts", "Jamie prefers texts over calls", "Tom's birthday is March 4". Counter-examples (just events, no TTR): "Saw Sarah at the park", "Tom called about the trip".
 
+### 6. Reminder requests → importance-based defaults
+When Matt asks for a reminder, analyze the request to score importance (0-10), then apply smart defaults:
+
+**Importance scoring criteria:**
+- Explicit urgency keywords ("don't forget", "can't miss", "important", "critical"): +3
+- Family member involved (daughter, son, wife, spouse, parent): +2
+- Specific time AND location details provided: +2
+- Event type (recital, performance, flight, medical appointment, wedding, interview): +3
+- Vague/casual language ("heads up", "FYI", "remember that"): -2
+
+**Response strategy by score:**
+
+**High importance (7-10):** Auto-generate multiple smart-default reminders and confirm:
+- Morning-of (8am local time)
+- 2 hours before event time (if time is known)
+
+Example response:
+> "Got it - your daughter's dance recital on Tue May 5 at 5:30 PM (Arlington Music Hall).
+>
+> This sounds important, so I'll remind you:
+> • Morning of (Tue 8am)
+> • 2 hours before (Tue 3:30pm)
+>
+> Sound good?"
+
+Wait for confirmation. If Matt approves or doesn't object, create both reminders. If Matt requests changes, adjust accordingly.
+
+**Medium importance (4-6):** Ask when to remind:
+> "Setting reminder for [event]. When should I ping you? (day before, morning of, 2 hours before, etc.)"
+
+**Low importance (0-3):** Auto-create simple day-before reminder at 9am, mention briefly:
+> "Reminder set for day before at 9am."
+
+**Time calculation:** Always use `./scripts/get-time.sh` with relative offsets ("+1 day", "+2 hours") to compute ISO UTC timestamps. Never do timezone math manually.
+
 ## Error shape
 
 ```json
@@ -192,6 +227,53 @@ Matt: "Link Sam to John" / "Link my sister's husband to her" / "Link Eli's frien
 6. Report: *"Added John (#88) to Sam & John group (#57) as spouse."*
 
 **Role hints:** "her husband" / "his wife" → `"spouse"`. "Eli's friend" → leave `role` null. "my sister's son" → `"child"` or `"nephew"` depending on context. When in doubt, leave null.
+
+### Create a reminder (importance-based)
+
+Matt: "Ok my daughter has an event on Tuesday. Need to make sure I don't forget" + [photo of dance recital flyer]
+
+1. **Analyze the request** and score importance:
+   - "don't forget" (+3)
+   - "daughter" (+2)
+   - Photo shows specific time (5:30 PM) and location (Arlington Music Hall) (+2)
+   - Event type is "recital" (+3)
+   - **Total: 10 → HIGH IMPORTANCE**
+
+2. **Extract event details** from the request and photo:
+   - Event: All-Star Dance recital
+   - Date: Tuesday, May 5
+   - Time: 5:30 PM
+   - Location: Arlington Music Hall
+
+3. **Generate smart defaults** for high-importance:
+   - Morning-of: Tuesday, May 5 at 8:00 AM
+   - 2 hours before: Tuesday, May 5 at 3:30 PM
+
+4. **Calculate due_at timestamps** using `./scripts/get-time.sh`:
+   ```bash
+   # For May 5, 8am CST
+   ./scripts/get-time.sh "2026-05-05T08:00:00-06:00"
+   # For May 5, 3:30pm CST
+   ./scripts/get-time.sh "2026-05-05T15:30:00-06:00"
+   ```
+
+5. **Present defaults and confirm:**
+   > "Got it - your daughter's dance recital on Tue May 5 at 5:30 PM (Arlington Music Hall).
+   >
+   > This sounds important, so I'll remind you:
+   > • Morning of (Tue 8am)
+   > • 2 hours before (Tue 3:30pm)
+   >
+   > Sound good?"
+
+6. **Wait for confirmation.** If Matt approves:
+   - `POST /api/agent/ai-reminders` with first reminder (8am)
+   - `POST /api/agent/ai-reminders` with second reminder (3:30pm)
+   - Both should include `person_id` for daughter if she's in the system
+
+7. **Report:** *"Created 2 reminders (#69, #70) for your daughter's recital."*
+
+**If Matt had said:** "Heads up there's a meeting Tuesday" (low urgency, no details) → score ~2 → auto-create simple day-before reminder at 9am without asking.
 
 ---
 
