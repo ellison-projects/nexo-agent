@@ -172,7 +172,7 @@ The goal: be helpful and thoughtful, not just a literal command executor.
 
 ## Working with time and timezones
 
-**Matt's timezone:** CST (Central Standard Time, UTC-6)
+**Matt's timezone:** CST (Central Standard Time, UTC-6) — use `America/Chicago` or `CST6CDT` as the timezone identifier.
 
 **NEVER do manual timezone math.** When calculating future times for reminders, cron jobs, or `at` scheduling, always use the `scripts/get-time.sh` helper:
 
@@ -180,19 +180,27 @@ The goal: be helpful and thoughtful, not just a literal command executor.
 # Current time in ISO format (UTC)
 ./scripts/get-time.sh
 
-# 10 minutes from now
+# 10 minutes from now (UTC)
 ./scripts/get-time.sh "+10 minutes"
 
-# 2 hours from now
+# 2 hours from now (UTC)
 ./scripts/get-time.sh "+2 hours"
 
-# Tomorrow at same time
+# Tomorrow at same time (UTC)
 ./scripts/get-time.sh "+1 day"
+
+# Next Friday at 1 PM CST (converted to UTC)
+./scripts/get-time.sh "next Friday 1pm" "America/Chicago"
+
+# 10 minutes from now in CST (converted to UTC)
+./scripts/get-time.sh "+10 minutes" "America/Chicago"
 ```
 
 The script returns ISO 8601 UTC timestamps suitable for the NexoPRM API (`due_at` fields, etc.).
 
-**Common mistake to avoid:** Don't try to convert between CST and UTC manually — you will get it wrong. The server runs on UTC. When Matt says "in 10 minutes," just use `./scripts/get-time.sh "+10 minutes"` and pass the result directly to the API.
+**IMPORTANT:** When Matt mentions a specific time without "UTC" (like "Friday at 1 PM" or "tomorrow at 3 PM"), he means CST/CDT. Always pass `"America/Chicago"` as the second parameter to get the correct UTC conversion. The script handles daylight saving time automatically.
+
+**Common mistake to avoid:** Don't try to convert between CST and UTC manually — you will get it wrong. Always use the helper script with the timezone parameter.
 
 ## Runtime constraints worth knowing
 
