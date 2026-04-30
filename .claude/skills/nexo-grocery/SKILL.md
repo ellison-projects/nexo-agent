@@ -35,9 +35,9 @@ Base URL: `https://app.nexoprm.com`
 2. **Never log or echo `NEXO_API_KEY`.**
 3. **CRITICAL: If any API endpoint fails (non-2xx response), STOP immediately and report the failure.** Include the endpoint, method, status code, and error response.
 4. **ALWAYS search Stash first before adding grocery items.** Use `GET /stash?tag=grocery&q=<item>` to check for existing curated product entries. If a match exists, pass only `stash_id` (server copies stash title to name). This preserves brand preferences.
-5. **Check for existing items before adding.** When the user asks to add items, first check if there are still unchecked items on the active grocery list:
-   - If there are unchecked items, **always confirm** — never assume the list is outdated: "You still have X unchecked items on your current list. Add to this list or start a new one?"
-   - If the list is empty (all items checked off), just create a new list and start adding items without asking.
+5. **Handle list state before adding items.** When the user asks to add items:
+   - If all items are checked off → create a new list first, then add items
+   - If any items are unchecked → just add to the existing list
 6. **Always report back what you updated.** After every successful write, tell the user in one line what changed and on which record — include the list/note name and the id. Example: *"Added 'Coke Zero 12-pack' (#3041) to groceries list #17."*
 
 ## Error shape
