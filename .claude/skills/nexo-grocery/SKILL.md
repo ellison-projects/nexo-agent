@@ -38,7 +38,8 @@ Base URL: `https://app.nexoprm.com`
 5. **Handle list state before adding items.** When the user asks to add items:
    - If all items are checked off → create a new list first, then add items
    - If any items are unchecked → just add to the existing list
-6. **Always report back the full grocery list with a count.** After adding items, show all unchecked items in a bulleted list with a count. Example format:
+6. **Check for duplicates before adding.** Before adding an item, get the active list and check if an unchecked item with the same name (case-insensitive) already exists. If it does, skip adding and just report the existing list.
+7. **Always report back the full grocery list with a count.** After adding items, show all unchecked items in a bulleted list with a count. Example format:
    ```
    Added Coke Zero. Your list (3 items):
    - Coke Zero
