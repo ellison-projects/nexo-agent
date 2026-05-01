@@ -1,6 +1,6 @@
 ---
 name: nexo-prm
-description: Use for non-person NexoPRM data — working notes (plans/todos), areas of focus, meals, food log, home items (household chores/maintenance), and stash (pocket knowledge base for non-person facts like products, places, gate codes). Also handles "debrief" — a read-only roll-up of open todos across home and the current plan. Invoke for requests like "what's on my plan", "remember that I like Reach floss", "save this cafe", "debrief me", or "what are my open todos". **For person-attached data (people, moments, things-to-remember, AI reminders, connection groups, lists, address/phone/email updates), use the `nexo-people` skill instead.** **For grocery operations, use the `nexo-grocery` skill instead.** **For notebooks/projects (multi-week threads), use the `nexo-notebooks` skill instead.** Calls the NexoPRM Agent API at app.nexoprm.com. Runs in a forked subagent — when invoking, pass the user's full intent as the argument, since this skill has no access to conversation history.
+description: Use for areas of focus and stash (pocket knowledge base for non-person facts like products, places, gate codes). Invoke for requests like "what are my focus areas", "remember that I like Reach floss", "save this cafe". **For person-attached data, use `nexo-people`.** **For grocery operations, use `nexo-grocery`.** **For notebooks/projects, use `nexo-notebooks`.** **For plan/todos/debrief, use `nexo-plan`.** **For meals/food log, use `nexo-meals`.** **For home items/chores, use `nexo-home`.** Calls the NexoPRM Agent API at app.nexoprm.com. Runs in a forked subagent — when invoking, pass the user's full intent as the argument, since this skill has no access to conversation history.
 context: fork
 ---
 
@@ -14,7 +14,7 @@ Fulfill the request above using the NexoPRM API reference below. Report back con
 
 ---
 
-Personal-relationship-manager API. Every request uses a god-mode bearer token plus a per-user impersonation header. This skill covers the **non-person** subset of the API (excluding groceries and notebooks). For person-attached resources (people, moments, things-to-remember, AI reminders, relationships, connection groups, lists, people reports), see the `nexo-people` skill. For grocery operations, see the `nexo-grocery` skill. For notebooks/projects (multi-week threads), see the `nexo-notebooks` skill.
+Personal-relationship-manager API. Every request uses a god-mode bearer token plus a per-user impersonation header. This skill covers **areas of focus** and **stash** only. For person-attached resources, see `nexo-people`. For groceries, see `nexo-grocery`. For notebooks/projects, see `nexo-notebooks`. For plan/todos, see `nexo-plan`. For meals/food log, see `nexo-meals`. For home items, see `nexo-home`.
 
 **Full API reference (source of truth):** https://app.nexoprm.com/agentapi/llm.md — fetch this if an endpoint or field shape isn't covered below, or if a call 404s / rejects unexpectedly (the API may have changed since this skill was last updated).
 
@@ -48,6 +48,9 @@ Base URL: `https://app.nexoprm.com`
 7. **For person-attached operations, defer to `nexo-people`.** If $ARGUMENTS asks you to log a moment, save a thing-to-remember, link people, update a person's contact info, or anything else person-shaped, return a note saying "this belongs in nexo-people" rather than calling those endpoints from here.
 8. **For grocery operations, defer to `nexo-grocery`.** If $ARGUMENTS asks you to add/view/check off grocery items, return a note saying "this belongs in nexo-grocery" rather than calling those endpoints from here.
 9. **For notebook/project operations, defer to `nexo-notebooks`.** If $ARGUMENTS asks you to create notebooks, add notes/reflections to projects, manage next actions, or link people to projects, return a note saying "this belongs in nexo-notebooks" rather than calling those endpoints from here.
+10. **For plan/todos operations, defer to `nexo-plan`.** If $ARGUMENTS asks you to add todos, check off plan items, debrief, or view the current plan, return a note saying "this belongs in nexo-plan" rather than calling those endpoints from here.
+11. **For meals/food log operations, defer to `nexo-meals`.** If $ARGUMENTS asks you to save meal ideas, log food intake, or view food log, return a note saying "this belongs in nexo-meals" rather than calling those endpoints from here.
+12. **For home items operations, defer to `nexo-home`.** If $ARGUMENTS asks you to add home tasks, mark chores as done, or manage home items, return a note saying "this belongs in nexo-home" rather than calling those endpoints from here.
 
 ## Error shape
 
@@ -76,44 +79,9 @@ All list endpoints accept `limit` (default 50, max 200) and `offset` (default 0)
 - `GET /api/agent/me` — verify token, resolve impersonated user. Returns `{ key, user }`.
 - `GET /api/agent/users` — list all users.
 
-### Briefing (one-shot situational awareness)
-Read-only roll-up of the user's whole state. Use for open-ended prompts ("debrief me", "what's going on", "catch me up") and as grounded context before answering anything broad. Window is ~14 days forward; 7 days back for recent moments.
-- `GET /api/agent/briefing` — no query params. Response top-level keys: `generated_at`, `window_days`, `user`, `pillars`, `goals`, `trigger_list`, `upcoming_important_dates`, `ai_reminders` (`{ overdue, upcoming, recently_done }`), `working_note_reminders`, `working_notes`, `things_to_remember`, `recent_moments`, `pinned_people`, `stale_people`, `pinned_lists`, `connection_groups`, `food_log`, `home_items`, `meal_plans`. Note: `grocery_items` also appears in the briefing but is handled by the `nexo-grocery` skill. Drill into dedicated endpoints only when you need more than the briefing contains.
-
-### Snapshots (before-state capture)
-Read-only. Every destructive agent write (DELETE, PATCH, PUT) creates a snapshot capturing the before-state. For deletes, cascade children are also snapshotted. Covers all resource types — including people-shaped writes performed via the `nexo-people` skill.
-- `GET /api/agent/snapshots?resourceType=&resourceId=&limit=&offset=` — list snapshots. Filter by resource type or id.
-- `GET /api/agent/snapshots/{id}` — retrieve full snapshot including original row data and cascade-deleted children.
-
-### Person-attached resources
-
-People, moments, things-to-remember, AI reminders, connection groups, lists, and people reports live in the `nexo-people` skill. If $ARGUMENTS asks for any of those, return a brief note that the request belongs there rather than calling those endpoints from here.
-
-### Working notes (on-demand plans with items + headings; one level of nesting)
-`{id}` accepts a numeric id OR the literal `latest` (404 if no notes yet). Items with no `parent_id` and `is_heading: false` are treated as **Drafts** — brain-dump zone for todos not yet organized. Headings can carry a `notes` field for long-form project context.
-- `GET /api/agent/working-notes`
-- `POST /api/agent/working-notes` — `{ priorities_text? }`.
-- `GET /api/agent/working-notes/{id|latest}` — returns `{ working_note, items }`. Items include `notes` field.
-- `PATCH /api/agent/working-notes/{id|latest}` — `{ priorities_text }`.
-- `DELETE /api/agent/working-notes/{id|latest}?confirm=true`
-- `POST /api/agent/working-notes/{id|latest}/items` — `{ content, parent_id?, is_heading?, notes? }`. `parent_id` must reference a heading in the same note. `sort_order` auto-assigned. `notes` optional (typically used for headings).
-- `PUT /api/agent/working-notes/{id|latest}/reorder` — rewrite `sort_order` for every item. Body: `{ item_ids: [...] }` — full ordered list of every item id in the note.
-- `PATCH /api/agent/working-note-items/{itemId}` — writable: `content`, `checked`, `is_heading`, `sort_order`, `parent_id`, `notes`. Send `notes: null` to clear.
-- `DELETE /api/agent/working-note-items/{itemId}?confirm=true`
-
 ### Areas of focus (ongoing life themes; typically 3–5)
 - `GET|POST /api/agent/areas-of-focus` — POST body `{ title, description, sort_order }`.
 - `GET|PATCH|DELETE /api/agent/areas-of-focus/{id}` — PATCH writable: `title`, `description`, `sort_order`.
-
-### Meals
-- `GET|POST /api/agent/meals` — POST body `{ name, notes, link }`.
-- `GET|PATCH|DELETE /api/agent/meals/{id}` — PATCH writable: `name`, `notes`, `link`.
-
-### Food log
-- `GET /api/agent/food-log?personName=&since=&until=&limit=&offset=`
-- `POST /api/agent/food-log` — only `description` required. Others: `person_name` (default ""), `calories`, `logged_at` (default NOW).
-- `PATCH /api/agent/food-log/{id}` — writable: `person_name`, `description`, `calories`, `logged_at`.
-- `DELETE /api/agent/food-log/{id}?confirm=true`
 
 ### Stash
 Pocket knowledge base for non-person facts. Products, places, gate codes, stray info worth recalling. Title + optional note + optional location + tags + optional photos.
@@ -123,142 +91,11 @@ Pocket knowledge base for non-person facts. Products, places, gate codes, stray 
 - `PATCH /api/agent/stash/{id}` — writable: `title`, `note`, `location`, `tags` (replaces full array), and/or `add_photo_urls` / `remove_photo_ids`.
 - `DELETE /api/agent/stash/{id}?confirm=true` — cascades to photos.
 
-### Home items
-Household maintenance / chores ("replace smoke alarm batteries", "regrout shower"). One implicit list per user — no parent list resource. "Open" = `done_at IS NULL`.
-- `GET /api/agent/home-items` — open items only by default. Pass `?done=true` to include completed. Returns `{ home_items: [...] }`; each row has `note_count`.
-- `POST /api/agent/home-items` — `{ title }` required. Returns `{ home_item }`, 201.
-- `GET /api/agent/home-items/{id}` — returns `{ home_item, notes }`.
-- `PATCH /api/agent/home-items/{id}` — writable: `title`, `done_at` (ISO timestamp to mark done, `null` to reopen).
-- `DELETE /api/agent/home-items/{id}?confirm=true` — cascades to notes.
-- `POST /api/agent/home-items/{id}/notes` — `{ content }`. Returns `{ note }`, 201.
-- `PATCH /api/agent/home-item-notes/{noteId}` — writable: `content`.
-- `DELETE /api/agent/home-item-notes/{noteId}?confirm=true`
-
-### Audit log (read-only)
-- `GET /api/agent/audit-log?userId=&since=&action=&resourceType=&limit=&offset=` — returns `{ entries: [...] }`. Bodies stored as SHA-256 digest, not raw.
-
 ---
 
-## Primary flows (worked end-to-end)
+## Primary flow
 
-These flows cover the main non-person use cases. Each shows the user prompt, the curl calls, the expected response JSON, and how to branch on ambiguity or missing parent records.
-
----
-
-### Flow A — Add to a working note (plan) item
-
-**User:** "Add 'call the plumber' to my plan."
-
-**Step 1. Try appending to the latest note.**
-```bash
-curl -s -X POST "https://app.nexoprm.com/api/agent/working-notes/latest/items" \
-  -H "Authorization: Bearer $NEXO_API_KEY" \
-  -H "X-Nexo-User: $NEXO_USER" \
-  -H "Content-Type: application/json" \
-  -d '{"content":"Call the plumber"}'
-```
-
-Expected response (201):
-```json
-{
-  "item": {
-    "id": "904",
-    "working_note_id": "61",
-    "content": "Call the plumber",
-    "parent_id": null,
-    "is_heading": false,
-    "checked": false,
-    "sort_order": 7
-  }
-}
-```
-
-Report back with ids:
-> "Added 'Call the plumber' (#904) to your current plan (note #61)."
-
-**Branch: no note yet (404).** Response:
-```json
-{ "error": "no working notes yet", "code": "not_found" }
-```
-
-Create one, then retry:
-```bash
-curl -s -X POST "https://app.nexoprm.com/api/agent/working-notes" \
-  -H "Authorization: Bearer $NEXO_API_KEY" \
-  -H "X-Nexo-User: $NEXO_USER" \
-  -H "Content-Type: application/json" \
-  -d '{}'
-```
-Response: `{ "working_note": { "id": "61", "priorities_text": null, ... } }` (201).
-
-Then repeat the `POST .../latest/items` call.
-
-**Ambiguity check:** if the user says "add it under Home" — they want the item nested under a heading called "Home". Fetch the note, find the heading id, and pass it as `parent_id`:
-```bash
-curl -s "https://app.nexoprm.com/api/agent/working-notes/latest" \
-  -H "Authorization: Bearer $NEXO_API_KEY" \
-  -H "X-Nexo-User: $NEXO_USER"
-```
-Response (abbreviated):
-```json
-{
-  "working_note": { "id": "61" },
-  "items": [
-    { "id": "900", "content": "Home", "is_heading": true,  "parent_id": null },
-    { "id": "901", "content": "Work", "is_heading": true,  "parent_id": null }
-  ]
-}
-```
-If no "Home" heading exists, ask:
-> "I don't see a 'Home' heading on your current plan. Create it, or add the item at the top level?"
-
-Otherwise POST with `parent_id: "900"`.
-
----
-
-### Flow B — Debrief (todos rollup via the briefing endpoint)
-
-**User:** "Debrief." (also: "what are my open todos?", "summary of my todos")
-
-Single-call, read-only. The briefing endpoint already rolls up everything Debrief needs — don't recreate it from individual calls.
-
-**Step 1. Fetch the briefing.**
-
-```bash
-curl -s "https://app.nexoprm.com/api/agent/briefing" \
-  -H "Authorization: Bearer $NEXO_API_KEY" \
-  -H "X-Nexo-User: $NEXO_USER"
-```
-
-**Step 2. Pick out the two todo-relevant sections.** The briefing has many more fields (pillars, goals, stale people, etc.); ignore them for Debrief. If the user follows up with something broader, reach back into the same response. Note: `grocery_items` also appears in the briefing but is handled by the `nexo-grocery` skill.
-
-- `home_items` — open household chores.
-- `working_note_reminders` — plan items flagged as due/overdue.
-
-Trust the briefing — don't pad the output with extra calls to `/working-notes/latest` or the home endpoints. If a field looks incomplete, tell the user so they can fix the briefing server-side.
-
-**Step 3. Render grouped, with ids so the user can check things off in a follow-up.**
-
-> **Debrief — 7 open**
->
-> **Home (3):**
-> - #124 Replace smoke alarm batteries
-> - #131 Regrout shower
-> - #140 Hang picture in hallway
->
-> **Plan reminders (4):**
-> - #905 Call the plumber
-> - #907 Draft Q2 plan
-> - #910 Book dentist
-> - #913 Email landlord
-
-**Empty handling.**
-- Any section with zero entries → omit it.
-- All sections empty → "Nothing open. You're clear."
-
----
-
-### Flow C — Save a non-person fact to Stash
+### Save a non-person fact to Stash
 
 **User:** "Remember that I like Reach floss" or "Save this cafe — they had great salads"
 
@@ -348,16 +185,12 @@ curl -s "https://app.nexoprm.com/api/agent/stash?tag=health" \
 
 ---
 
-## Other common operations (quick reference)
+## Other common operations
 
-- **Save a non-person fact:** `POST /stash` with `{ "title": "...", "note": "...", "tags": [...] }`. Use for products, places, gate codes, etc.
-- **Check off a plan item:** `GET /working-notes/latest` → find item → `PATCH /working-note-items/{id}` with `{ "checked": true }`.
-- **Add long-form notes to a heading:** `PATCH /working-note-items/{headingId}` with `{ "notes": "Long-form project context here..." }`.
-- **Promote a heading to the top:** `GET /working-notes/latest` → reorder items array (heading + children to front) → `PUT /working-notes/latest/reorder` with `{ "item_ids": [...] }`.
-- **Delete anything:** append `?confirm=true`. Only after explicit user intent. Example:
-  ```bash
-  curl -s -X DELETE "https://app.nexoprm.com/api/agent/home-items/812?confirm=true" \
-    -H "Authorization: Bearer $NEXO_API_KEY" \
-    -H "X-Nexo-User: $NEXO_USER"
-  ```
-- **Dry-run a write** (validate without persisting): add `-H "X-Nexo-Dry-Run: true"` to any POST/PATCH/DELETE.
+- **View all areas of focus:** `GET /api/agent/areas-of-focus`
+- **Update an area of focus:** `PATCH /api/agent/areas-of-focus/{id}` with `title`, `description`, or `sort_order`
+- **Delete an area of focus:** `DELETE /api/agent/areas-of-focus/{id}?confirm=true`
+- **Search stash by keyword:** `GET /api/agent/stash?q=keyword`
+- **Search stash by tag:** `GET /api/agent/stash?tag=tagname`
+- **Update a stash entry:** `PATCH /api/agent/stash/{id}` with any of `title`, `note`, `location`, `tags`, `add_photo_urls`, `remove_photo_ids`
+- **Delete a stash entry:** `DELETE /api/agent/stash/{id}?confirm=true`
