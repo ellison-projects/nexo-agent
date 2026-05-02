@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile, readdir, appendFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join, basename } from 'node:path';
 
@@ -8,7 +8,43 @@ const publicDir = resolve(__dirname, '../../public');
 const indexPath = resolve(publicDir, 'index.html');
 const briefingsDir = resolve(publicDir, 'briefings');
 const apiSnapshotsDir = resolve(publicDir, 'api-snapshots');
+const webhookLogPath = resolve(__dirname, '../../logs/webhook.log');
 const port = Number(process.env.WEB_PORT ?? 8080);
+
+async function logWebhook(source: string, payload: any): Promise<void> {
+  const timestamp = new Date().toISOString();
+  const logEntry = `[${timestamp}] ${source}\n${JSON.stringify(payload, null, 2)}\n\n`;
+
+  try {
+    await appendFile(webhookLogPath, logEntry, 'utf-8');
+  } catch (err) {
+    console.error('Failed to write webhook log:', err);
+  }
+}
+
+function formatVercelWebhook(payload: any): string {
+  const { type, deployment, team } = payload;
+
+  // Extract key info
+  const deploymentUrl = deployment?.url || 'unknown';
+  const projectName = deployment?.project?.name || team?.name || 'unknown';
+  const status = deployment?.state || type?.replace('deployment.', '') || 'unknown';
+  const creator = deployment?.creator?.username || 'unknown';
+
+  // Status emoji
+  let emoji = '🔔';
+  if (status === 'READY' || status === 'succeeded') emoji = '✅';
+  else if (status === 'ERROR' || status === 'failed' || status === 'error') emoji = '❌';
+  else if (status === 'BUILDING' || status === 'created') emoji = '🔨';
+  else if (status === 'CANCELED') emoji = '⚠️';
+
+  return `${emoji} *Vercel Deployment ${status}*\n\n` +
+         `**Project:** ${projectName}\n` +
+         `**URL:** https://${deploymentUrl}\n` +
+         `**Creator:** ${creator}\n` +
+         (deployment?.meta?.githubCommitMessage ? `**Commit:** ${deployment.meta.githubCommitMessage}\n` : '') +
+         `\n_${new Date().toISOString()}_`;
+}
 
 async function sendTelegramMessage(text: string): Promise<void> {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
@@ -50,10 +86,22 @@ const server = createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         const payload = JSON.parse(body);
-        const timestamp = new Date().toISOString();
 
-        // Format webhook notification
-        const message = `🔔 *Webhook Notification*\n\n\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\`\n\n_${timestamp}_`;
+        // Detect webhook source
+        let source = 'generic';
+        let message = '';
+
+        if (payload.type?.startsWith('deployment.') || payload.deployment) {
+          // Vercel webhook
+          source = 'vercel';
+          await logWebhook(source, payload);
+          message = formatVercelWebhook(payload);
+        } else {
+          // Generic webhook - log raw JSON
+          source = 'generic';
+          await logWebhook(source, payload);
+          message = `🔔 *Webhook Notification*\n\n\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\`\n\n_${new Date().toISOString()}_`;
+        }
 
         await sendTelegramMessage(message);
 
