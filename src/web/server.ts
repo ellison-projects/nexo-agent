@@ -74,11 +74,11 @@ function formatVercelWebhook(payload: any): string {
 }
 
 async function sendTelegramMessage(text: string): Promise<void> {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const botToken = process.env.DEBUG_TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.DEBUG_TELEGRAM_CHAT_ID;
 
   if (!botToken || !chatId) {
-    console.error('Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID for webhook notification');
+    console.error('Missing DEBUG_TELEGRAM_BOT_TOKEN or DEBUG_TELEGRAM_CHAT_ID for webhook notification');
     return;
   }
 
