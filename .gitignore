@@ -4,3 +4,4 @@ node_modules
 bot.log
 public/api-snapshots/
 data/
+logs/webhook.log
