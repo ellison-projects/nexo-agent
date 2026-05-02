@@ -43,8 +43,6 @@ pm2 delete nexo-agent >/dev/null 2>&1 || true
 pm2 delete nexo-web >/dev/null 2>&1 || true
 pm2 delete nexo-reminders >/dev/null 2>&1 || true
 
-notify "🧹 Old apps cleared, booting fresh..."
-
 # Fresh start — apps were deleted above, so this is a clean register + boot.
 pm2 start ecosystem.config.cjs --update-env
 pm2 save >/dev/null
