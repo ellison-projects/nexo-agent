@@ -245,6 +245,20 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  // Serve robots.txt
+  if (req.url === '/robots.txt') {
+    try {
+      const robotsTxt = await readFile(join(publicDir, 'robots.txt'), 'utf-8');
+      res.writeHead(200, {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'public, max-age=86400',
+      }).end(robotsTxt);
+    } catch (err) {
+      res.writeHead(404, { 'Content-Type': 'text/plain' }).end('Not Found');
+    }
+    return;
+  }
+
   // Serve index.html
   if (req.url !== '/' && req.url !== '/index.html') {
     res.writeHead(404, { 'Content-Type': 'text/plain' }).end('Not Found');
