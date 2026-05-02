@@ -86,6 +86,32 @@ The twelve fork-context project skills above (`nexo-grocery`, `nexo-notebooks`, 
 - `npm run stop` / `npm run logs` / `npm run status` — pm2 passthroughs.
 - `npm run reset-session` — deletes `.session-id` and restarts. Use when the agent's accumulated Telegram conversation context has gone stale or wrong.
 
+**IMPORTANT: Working directory context for restart commands**
+
+The box runs multiple independent agents in separate directories (`/root/code/nexo-agent`, `/root/code/Dev-Agent`, `/root/code/carfluent-agent`). Each has its own `.env` file, pm2 apps, and Telegram bot. When restarting an agent:
+
+- **Always `cd` into the target repo first** — `cd /root/code/Dev-Agent && npm run restart`
+- **Never run restarts from the wrong directory** — the restart script loads `.env` from the current working directory, so running from the wrong location will send Telegram notifications via the wrong bot token
+- **Each agent restarts independently** — restarting nexo-agent does NOT cascade to Dev-Agent or carfluent-agent; they are completely isolated pm2 processes
+
+Example of correct usage:
+```bash
+# Restart nexo-agent
+cd /root/code/nexo-agent && npm run restart
+
+# Restart dev-agent
+cd /root/code/Dev-Agent && npm run restart
+
+# Restart carfluent-agent
+cd /root/code/carfluent-agent && npm run restart
+```
+
+Wrong (will send notifications to wrong bot):
+```bash
+# BAD - this loads nexo-agent's .env but tries to restart dev-agent
+npm run restart  # from /root/code/nexo-agent while intending to restart dev-agent
+```
+
 There is no test suite, linter, or typecheck script. `tsconfig.json` is `noEmit: true` — types are checked by the editor, not in CI.
 
 ## Architecture
