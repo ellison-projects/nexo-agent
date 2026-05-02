@@ -50,13 +50,21 @@ async function logWebhook(source: string, payload: any): Promise<void> {
 }
 
 function formatVercelWebhook(payload: any): string {
-  const { type, deployment, team } = payload;
+  // Handle both test payload format and real Vercel webhook format
+  const isRealWebhook = payload.payload !== undefined;
+
+  const deployment = isRealWebhook ? payload.payload.deployment : payload.deployment;
+  const project = isRealWebhook ? payload.payload.project : payload.deployment?.project;
+  const team = isRealWebhook ? payload.payload.team : payload.team;
+  const type = payload.type || '';
 
   // Extract key info
-  const deploymentUrl = deployment?.url || 'unknown';
-  const projectName = deployment?.project?.name || team?.name || 'unknown';
-  const status = deployment?.state || type?.replace('deployment.', '') || 'unknown';
+  const deploymentUrl = deployment?.url || payload.payload?.url || 'unknown';
+  const projectName = payload.payload?.name || project?.name || deployment?.name || team?.name || 'unknown';
+  const status = type.replace('deployment.', '') || deployment?.state || 'unknown';
   const creator = deployment?.creator?.username || 'unknown';
+  const commitMessage = deployment?.meta?.githubCommitMessage || '';
+  const commitAuthor = deployment?.meta?.githubCommitAuthorName || '';
 
   // Status emoji
   let emoji = '🔔';
@@ -68,8 +76,8 @@ function formatVercelWebhook(payload: any): string {
   return `${emoji} *Vercel Deployment ${status}*\n\n` +
          `**Project:** ${projectName}\n` +
          `**URL:** https://${deploymentUrl}\n` +
-         `**Creator:** ${creator}\n` +
-         (deployment?.meta?.githubCommitMessage ? `**Commit:** ${deployment.meta.githubCommitMessage}\n` : '') +
+         (commitAuthor ? `**Author:** ${commitAuthor}\n` : '') +
+         (commitMessage ? `**Commit:** ${commitMessage}\n` : '') +
          `\n_${new Date().toISOString()}_`;
 }
 
