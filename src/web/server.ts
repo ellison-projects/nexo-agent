@@ -1,7 +1,8 @@
 import { createServer } from 'node:http';
-import { readFile, readdir, appendFile } from 'node:fs/promises';
+import { readFile, readdir, appendFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join, basename } from 'node:path';
+import { existsSync } from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = resolve(__dirname, '../../public');
@@ -10,6 +11,32 @@ const briefingsDir = resolve(publicDir, 'briefings');
 const apiSnapshotsDir = resolve(publicDir, 'api-snapshots');
 const webhookLogPath = resolve(__dirname, '../../logs/webhook.log');
 const port = Number(process.env.WEB_PORT ?? 8080);
+
+async function purgeOldWebhookLogs(): Promise<void> {
+  if (!existsSync(webhookLogPath)) return;
+
+  try {
+    const content = await readFile(webhookLogPath, 'utf-8');
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    // Split into log entries (each starts with [timestamp])
+    const entries = content.split(/(?=\[\d{4}-\d{2}-\d{2}T)/);
+
+    // Filter to keep only entries from last 7 days
+    const recentEntries = entries.filter(entry => {
+      const match = entry.match(/^\[(\d{4}-\d{2}-\d{2}T[\d:.]+Z)\]/);
+      if (!match) return false;
+
+      const entryDate = new Date(match[1]);
+      return entryDate >= sevenDaysAgo;
+    });
+
+    // Write back only recent entries
+    await writeFile(webhookLogPath, recentEntries.join(''), 'utf-8');
+  } catch (err) {
+    console.error('Failed to purge old webhook logs:', err);
+  }
+}
 
 async function logWebhook(source: string, payload: any): Promise<void> {
   const timestamp = new Date().toISOString();
@@ -227,6 +254,12 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.listen(port, () => {
+server.listen(port, async () => {
   console.log(`nexo-web listening on http://0.0.0.0:${port}`);
+
+  // Purge old webhook logs on startup
+  await purgeOldWebhookLogs();
+
+  // Purge old webhook logs daily
+  setInterval(purgeOldWebhookLogs, 24 * 60 * 60 * 1000);
 });
