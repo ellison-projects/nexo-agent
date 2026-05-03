@@ -54,7 +54,7 @@ Codes: `unauthorized`, `forbidden`, `not_found`, `validation_error`, `conflict`,
 - Timestamps are ISO 8601 UTC.
 - Request bodies use **snake_case** (`notebook_id`, `person_id`, `target_date`), not camelCase.
 
-**Note:** The API currently uses "projects" terminology in endpoints, but conceptually these are "notebooks" — ongoing topics you keep coming back to, not necessarily outcome-oriented threads.
+**Note:** The API uses "notebooks" terminology in endpoints. Notebooks are ongoing topics you keep coming back to, not necessarily outcome-oriented threads.
 
 ---
 
@@ -63,17 +63,17 @@ Codes: `unauthorized`, `forbidden`, `not_found`, `validation_error`, `conflict`,
 ### Notebooks (Projects)
 Multi-week initiatives and ongoing topics. Each has notes, next actions, optional people links, tags, and optional target date.
 
-- `GET /api/agent/projects?tag=&include=archived` — list notebooks. Excludes archived by default. Filter by tag.
-- `POST /api/agent/projects` — create notebook. Required: `title`. Optional: `description`, `overview_notes`, `pillar` (`family`/`relationships`/`health`/`ambitions`), `target_date`, `tags`.
-- `GET /api/agent/projects/tags` — distinct tags across non-archived notebooks with counts.
-- `GET /api/agent/projects/{id}` — full detail: `project`, `notes` (each with `images` and `tags`), `actions`, `linked_people`, `reminders`.
-- `PATCH /api/agent/projects/{id}` — partial update. Writable: `title`, `description`, `overview_notes`, `pillar`, `target_date`, `tags`, `pinned_at`, `archived_at`.
-- `DELETE /api/agent/projects/{id}?confirm=true` — cascades to notes, actions, images, reminders.
+- `GET /api/agent/notebooks?tag=&include=archived` — list notebooks. Excludes archived by default. Filter by tag.
+- `POST /api/agent/notebooks` — create notebook. Required: `title`. Optional: `description`, `overview_notes`, `pillar` (`family`/`relationships`/`health`/`ambitions`), `target_date`, `tags`.
+- `GET /api/agent/notebooks/tags` — distinct tags across non-archived notebooks with counts.
+- `GET /api/agent/notebooks/{id}` — full detail: `notebook`, `notes` (each with `images` and `tags`), `actions`, `linked_people`, `reminders`.
+- `PATCH /api/agent/notebooks/{id}` — partial update. Writable: `title`, `description`, `overview_notes`, `pillar`, `target_date`, `tags`, `pinned_at`, `archived_at`.
+- `DELETE /api/agent/notebooks/{id}?confirm=true` — cascades to notes, actions, images, reminders.
 
 ### Notebook Notes
-- `POST /api/agent/projects/{id}/notes` — add note. Required: `content`. Optional: `kind` (`note` default, or `reflection`), `tags` (string array), `image_urls`, `created_at`.
-- `PATCH /api/agent/projects/{id}/notes/{noteId}` — edit content/kind/tags; `add_image_urls`, `remove_image_ids`. Pass `tags: []` to clear all tags.
-- `DELETE /api/agent/projects/{id}/notes/{noteId}?confirm=true`
+- `POST /api/agent/notebooks/{id}/notes` — add note. Required: `content`. Optional: `kind` (`note` default, or `reflection`), `tags` (string array), `image_urls`, `created_at`.
+- `PATCH /api/agent/notebooks/{id}/notes/{noteId}` — edit content/kind/tags; `add_image_urls`, `remove_image_ids`. Pass `tags: []` to clear all tags.
+- `DELETE /api/agent/notebooks/{id}/notes/{noteId}?confirm=true`
 
 **Note kinds:**
 - `note` = "what happened" (raw observation)
@@ -82,22 +82,22 @@ Multi-week initiatives and ongoing topics. Each has notes, next actions, optiona
 **Per-note tags:** Use for slicing long timelines within one notebook. Example: annual father-son trip notebook — tag each year's notes with `["2026"]`, `["2027"]` to filter without splitting notebooks.
 
 ### Next Actions
-- `POST /api/agent/projects/{id}/actions` — add next-action. Required: `content`. Optional: `due_date`.
-- `PATCH /api/agent/projects/{id}/actions/{actionId}` — edit content/due/sort or mark done via `done_at` (ISO or null).
-- `DELETE /api/agent/projects/{id}/actions/{actionId}?confirm=true`
+- `POST /api/agent/notebooks/{id}/actions` — add next-action. Required: `content`. Optional: `due_date`.
+- `PATCH /api/agent/notebooks/{id}/actions/{actionId}` — edit content/due/sort or mark done via `done_at` (ISO or null).
+- `DELETE /api/agent/notebooks/{id}/actions/{actionId}?confirm=true`
 
 ### People Links
-- `POST /api/agent/projects/{id}/people` — link person. `{ "person_id": "..." }`.
-- `DELETE /api/agent/projects/{id}/people/{personId}?confirm=true` — unlink.
+- `POST /api/agent/notebooks/{id}/people` — link person. `{ "person_id": "..." }`.
+- `DELETE /api/agent/notebooks/{id}/people/{personId}?confirm=true` — unlink.
 
 ---
 
 ## Common operations
 
-- **Create a notebook:** `POST /projects` with `{ "title": "Annual Father-Son Trip", "pillar": "family", "tags": ["jackson", "father-son"] }`.
-- **Add a note:** Find or create the notebook → `POST /projects/{id}/notes` with `{ "content": "...", "kind": "note" }`.
+- **Create a notebook:** `POST /notebooks` with `{ "title": "Annual Father-Son Trip", "pillar": "family", "tags": ["jackson", "father-son"] }`.
+- **Add a note:** Find or create the notebook → `POST /notebooks/{id}/notes` with `{ "content": "...", "kind": "note" }`.
 - **Add a reflection:** Same as note but use `{ "content": "...", "kind": "reflection" }`.
-- **Add a next action:** `POST /projects/{id}/actions` with `{ "content": "Talk to Celine about destination" }`.
+- **Add a next action:** `POST /notebooks/{id}/actions` with `{ "content": "Talk to Celine about destination" }`.
 - **Link a person to notebook:** `POST /projects/{id}/people` with `{ "person_id": "102" }`.
 - **View all notebooks:** `GET /projects` returns list with basic info.
 - **View notebook details:** `GET /projects/{id}` returns everything in one call.
